@@ -1,55 +1,32 @@
 import React, { useState } from 'react';
-import {
-  Box, TextField, Button, Typography, Checkbox,
-  FormControlLabel, InputAdornment, IconButton,
-  Grid, createTheme, ThemeProvider, CssBaseline, alpha, Divider
+import { 
+  Box, Grid, Typography, TextField, Button, IconButton, 
+  InputAdornment, Link, Stack, Fade, Divider, InputLabel, FormControl 
 } from '@mui/material';
-import {
-  Visibility, VisibilityOff, MailOutlineRounded,
-  LockOutlined, VerifiedUserRounded, ArrowForwardRounded,
-  SettingsSuggestRounded, RuleRounded, AccountBalanceWalletRounded
+import { 
+  Visibility, VisibilityOff, LockOutlined, EmailOutlined, 
+  VerifiedUserOutlined, AccountBalanceOutlined 
 } from '@mui/icons-material';
-
-import useAuth from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
 import axios from '../../config/axios';
+import useAuth from '../hooks/useAuth';
+import toast from 'react-hot-toast';
 
-const theme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: { main: '#00E5FF' },
-    background: { default: '#FFFFFF' },
-  },
-  typography: {
-    fontFamily: '"Inter", sans-serif',
-    h3: { fontWeight: 900, letterSpacing: '-2px' }
-  },
-});
-
-export default function KaontyProSplit() {
+const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const { setAuth } = useAuth();
-  const navigate = useNavigate();
+  const [credentials, setCredentials] = useState({ email: '', password: '' });
 
-  const textFieldStyle = {
-    '& .MuiOutlinedInput-root': {
-      borderRadius: '4px',
-      backgroundColor: '#FCFCFC',
-      '& fieldset': { borderColor: '#E2E8F0' },
-      '&:hover fieldset': { borderColor: '#CBD5E1' },
-      '&.Mui-focused fieldset': { borderColor: '#00E5FF', borderWidth: '1px' },
-    },
-    '& input': { fontSize: '0.9rem', py: 1.5 }
+  const navigate = useNavigate();
+  const { setAuth } = useAuth();
+
+  const handleChange = (e) => {
+    setCredentials({ ...credentials, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     try {
-
-      const response = await axios.post('/', { email, password },
+      const response = await axios.post('/api/', { email:credentials.email, password: credentials.password },
         {
           headers: { 'Content-Type': 'application/json' },
           withCredentials: true
@@ -58,7 +35,7 @@ export default function KaontyProSplit() {
 
       const accessToken = response?.data?.accessToken;
       setAuth({ accessToken });
-      navigate("/tab/home");
+      navigate("/dashboard");
     } catch (err) {
       if (!err.response) {
         toast.error('Le serveur ne repond pas');
@@ -70,130 +47,197 @@ export default function KaontyProSplit() {
         toast.error('Erreur de connexion');
       }
     }
-  }
+  };
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Grid container sx={{ minHeight: '100vh' }}>
-
-        {/* --- CÔTÉ GAUCHE : FORMULAIRE CHIRURGICAL --- */}
-        <Grid item xs={12} md={5} lg={4} sx={{
-          display: 'flex', flexDirection: 'column', p: { xs: 4, md: 8 }, bgcolor: '#FFFFFF'
-        }}>
-          <Box sx={{ mb: 'auto' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 8 }}>
-              <Box sx={{ width: 35, height: 35, bgcolor: '#010810', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography variant="h6" sx={{ color: '#00E5FF', fontWeight: 900, fontSize: '1rem' }}>K</Typography>
-              </Box>
-              <Typography variant="h6" fontWeight={900} color="#010810" sx={{ letterSpacing: '-1px' }}>KAONTY</Typography>
+    <Grid container sx={{ minHeight: '100vh' }}>
+      
+      {/* GAUCHE : FORMULAIRE */}
+      <Grid item xs={12} md={5} lg={4} sx={{ display: 'flex', alignItems: 'center', bgcolor: 'white' }}>
+        <Fade in timeout={800}>
+          {/* Un seul enfant Box ici pour éviter l'erreur style/ref */}
+          <Box sx={{ p: { xs: 4, sm: 8 }, width: '100%' }}>
+            <Box sx={{ mb: 6 }}>
+              <Stack direction={'row'} sx={{mb:10}}>
+                <img src="/logo500.png" alt="OECFM" style={{ height: 80, marginBottom: 0 }} />
+                <Box>
+                  <Typography 
+                      variant="h6" 
+                      sx={{ 
+                          ml: 2, 
+                          fontWeight: 800, 
+                          color: 'Black', 
+                          letterSpacing: 0.5,
+                          whiteSpace: 'nowrap' // Évite que le texte saute à la ligne
+                      }}
+                  >
+                      OECFM <span style={{ color: '#8BC34A' }}>Admin</span>
+                  </Typography>
+                  <Typography 
+                    variant="body1" color="text.secondary"
+                    sx={{ 
+                          ml: 2, 
+                          fontWeight: 800, 
+                      }}
+                  >
+                    Ordre des Experts Comptables de Madagascar.
+                  </Typography>
+                </Box>
+                
+              </Stack>
+              
+              <Typography variant="h4" sx={{ fontWeight: 800, color: 'primary.main' }}>
+                Portail Membres
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                Accédez à votre espace expert-comptable sécurisé.
+              </Typography>
             </Box>
 
-            <Typography variant="h5" sx={{ fontWeight: 900, color: '#010810', mb: 1 }}>Connexion Expert</Typography>
-            <Typography variant="body2" sx={{ color: '#64748B', mb: 5 }}>Accédez à votre terminal de gestion comptable Malagasy.</Typography>
+            <form onSubmit={handleSubmit}>
+              <Stack spacing={2.5}>
+                {/* Champ Email */}
+                <Box>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ mb: 1, fontWeight: 600, color: 'text.primary', ml: 0.5 }}
+                  >
+                    Adresse email professionnelle
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    placeholder="exemple@oecfm.mg"
+                    name="email"
+                    onChange={handleChange}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        bgcolor: '#f9fafb', // Léger gris pour l'intérieur
+                        '& fieldset': { border: '1px solid #e5e7eb' }, // Bordure fine
+                        '&:hover fieldset': { borderColor: 'primary.main' },
+                      }
+                    }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <EmailOutlined fontSize="small" />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Box>
 
-            <Box component="form">
-              <Typography variant="caption" sx={{ fontWeight: 800, color: '#010810', display: 'block', mb: 1 }}>EMAIL PROFESSIONNEL</Typography>
-              <TextField
-                fullWidth placeholder="nom@cabinet.mg"
-                onChange={e => setEmail(e.target.value)}
-                sx={{ ...textFieldStyle, mb: 3 }}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start"><MailOutlineRounded sx={{ fontSize: 20, color: '#94A3B8' }} /></InputAdornment>,
-                }}
-              />
+                {/* Champ Mot de passe */}
+                <Box>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ mb: 1, fontWeight: 600, color: 'text.primary', ml: 0.5 }}
+                  >
+                    Mot de passe
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    name="password"
+                    onChange={handleChange}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        bgcolor: '#f9fafb',
+                        '& fieldset': { border: '1px solid #e5e7eb' },
+                        '&:hover fieldset': { borderColor: 'primary.main' },
+                      }
+                    }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <LockOutlined fontSize="small" />
+                        </InputAdornment>
+                      ),
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Box>
+              </Stack>
 
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Typography variant="caption" sx={{ fontWeight: 800, color: '#010810' }}>MOT DE PASSE</Typography>
-                <Typography variant="caption" sx={{ color: '#00E5FF', fontWeight: 700, cursor: 'pointer' }}>Oublié ?</Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                <Link href="#" variant="body2" color="secondary" sx={{ fontWeight: 500 }}>
+                  Mot de passe oublié ?
+                </Link>
               </Box>
-              <TextField
-                fullWidth type={showPassword ? 'text' : 'password'} placeholder="••••••••"
-                onChange={e => setPassword(e.target.value)}
-                sx={{ ...textFieldStyle, mb: 4 }}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start"><LockOutlined sx={{ fontSize: 20, color: '#94A3B8' }} /></InputAdornment>,
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton onClick={() => setShowPassword(!showPassword)} size="small"><Visibility fontSize="small" /></IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
 
               <Button
-                fullWidth variant="contained"
-                type='submit'
-                onClick={handleSubmit}
-                endIcon={<ArrowForwardRounded />}
-                sx={{
-                  py: 1.8, borderRadius: '4px', fontWeight: 800,
-                  bgcolor: '#010810', color: '#FFFFFF', textTransform: 'none',
-                  '&:hover': { bgcolor: '#00E5FF', color: '#010810', boxShadow: 'none' }
+                fullWidth
+                type="submit"
+                variant="contained"
+                size="large"
+                sx={{ 
+                  mt: 4, py: 1.5, fontWeight: 700,
+                  '&:hover': { transform: 'translateY(-2px)', transition: '0.2s' } 
                 }}
               >
-                Accéder au terminal
+                Se connecter
               </Button>
+            </form>
 
-              <FormControlLabel
-                control={<Checkbox size="small" defaultChecked />}
-                label={<Typography variant="caption" sx={{ color: '#64748B', fontWeight: 500 }}>Maintenir la session active</Typography>}
-                sx={{ mt: 3 }}
-              />
+            <Divider sx={{ my: 4 }}>OU</Divider>
+
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="body2">
+                Nouveau membre ? <Link href="#" sx={{ fontWeight: 700 }}>Créer un compte</Link>
+              </Typography>
             </Box>
           </Box>
-
-          <Typography variant="caption" sx={{ color: '#CBD5E1', mt: 4 }}>
-            © 2026 Kaonty • Standard PCG 2005 conforme
-          </Typography>
-        </Grid>
-
-        <Grid item xs={12} md={7} lg={8} sx={{
-          display: { xs: 'none', md: 'flex' },
-          flexDirection: 'column', justifyContent: 'center',
-          p: 12,
-          background: 'radial-gradient(circle at 20% 30%, #2f4566 0%, #010810 100%)',
-          position: 'relative'
-        }}>
-          <Box sx={{
-            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            backgroundImage: 'radial-gradient(#ffffff05 1px, transparent 1px)',
-            backgroundSize: '30px 30px', opacity: 0.5
-          }} />
-
-          <Box sx={{ position: 'relative', zIndex: 1 }}>
-            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, px: 2, py: 0.5, borderRadius: '4px', bgcolor: alpha('#00E5FF', 0.1), border: '1px solid', borderColor: alpha('#00E5FF', 0.2), mb: 4 }}>
-              <VerifiedUserRounded sx={{ fontSize: 14, color: '#00E5FF' }} />
-              <Typography variant="caption" sx={{ color: '#00E5FF', fontWeight: 900, letterSpacing: '1px' }}>SYSTÈME AU NORME MG</Typography>
-            </Box>
-
-            <Typography variant="h3" sx={{ color: '#FFFFFF', fontWeight: 900, mb: 0, maxWidth: 600 }}>
-              Le pilotage financier <br />
-            </Typography>
-
-            <Typography variant="h4" sx={{ color: '#FFFFFF', fontWeight: 900, mb: 4, maxWidth: 600 }}>
-              <span style={{ color: '#00E5FF' }}>sans compromis.</span>
-            </Typography>
-
-            <Grid container spacing={4} sx={{ mt: 4 }}>
-              {[
-                { icon: <SettingsSuggestRounded />, title: "Révision Automatique", desc: "Contrôle de cohérence et dossier de révision digitalisé." },
-                { icon: <AccountBalanceWalletRounded />, title: "Fiscalité Native", desc: "TVA, IR et Annexes générées en temps réel." },
-                { icon: <RuleRounded />, title: "Pré-audit Expert", desc: "Détection des anomalies comptables avant clôture." }
-              ].map((item, index) => (
-                <Grid item xs={12} sm={4} key={index}>
-                  <Box sx={{ p: 3, borderLeft: '1px solid', borderColor: alpha('#00E5FF', 0.3) }}>
-                    <Box sx={{ color: '#00E5FF', mb: 2 }}>{item.icon}</Box>
-                    <Typography variant="subtitle2" sx={{ color: '#FFFFFF', fontWeight: 800, mb: 1 }}>{item.title}</Typography>
-                    <Typography variant="caption" sx={{ color: '#64748B', lineHeight: 1.5, display: 'block' }}>{item.desc}</Typography>
-                  </Box>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
-        </Grid>
-
+        </Fade>
       </Grid>
-    </ThemeProvider>
+
+      {/* DROITE : ORNEMENTALE */}
+      <Grid 
+        item md={7} lg={8} 
+        sx={{ 
+          display: { xs: 'none', md: 'flex' }, 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          position: 'relative',
+          background: 'linear-gradient(rgba(67, 88, 68, 0.92), rgba(67, 88, 68, 0.92)), url(https://images.unsplash.com/photo-1454165833767-0275084924cd?q=80&w=1920)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          color: 'white',
+          p: 8
+        }}
+      >
+        <Fade in timeout={1500}>
+          <Stack spacing={4} sx={{ maxWidth: 600, textAlign: 'center' }}>
+            <VerifiedUserOutlined sx={{ fontSize: 80, color: 'secondary.main', mx: 'auto' }} />
+            <Box>
+              <Typography variant="h3" sx={{ fontWeight: 800, mb: 2 }}>
+                L'Excellence Comptable à Madagascar
+              </Typography>
+              <Typography variant="h6" sx={{ opacity: 0.8, fontWeight: 400 }}>
+                Gérez vos cotisations, vos attestations et votre historique de membre en toute simplicité.
+              </Typography>
+            </Box>
+            
+            <Stack direction="row" spacing={4} justifyContent="center" sx={{ pt: 4 }}>
+              <Box>
+                <AccountBalanceOutlined sx={{ color: 'secondary.main', fontSize: 40 }} />
+                <Typography variant="h6">Ordre National</Typography>
+              </Box>
+              <Box>
+                <VerifiedUserOutlined sx={{ color: 'secondary.main', fontSize: 40 }} />
+                <Typography variant="h6">Sécurisé</Typography>
+              </Box>
+            </Stack>
+          </Stack>
+        </Fade>
+      </Grid>
+    </Grid>
   );
-}
+};
+
+export default LoginPage;

@@ -8,7 +8,7 @@ const useLogout = () => {
         setAuth({});
 
         try {
-            await axios('/logout', {
+            await axios('/api/logout', {
                 withCredentials: true
             });
             sessionStorage.clear();

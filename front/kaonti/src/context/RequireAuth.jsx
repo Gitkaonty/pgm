@@ -16,6 +16,7 @@ const RequireAuth = ({ allowedRoles }) => {
     }
 
     const role = decoded?.UserInfo?.roles; // STRING
+
     if (!role || !allowedRoles.includes(role)) {
         return <Navigate to="/tab/unauthorized" state={{ from: location }} replace />;
     }

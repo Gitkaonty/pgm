@@ -50,12 +50,16 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING(255),
             allowNull: false
         },
-        roles: {
-            type: DataTypes.JSON,
-            allowNull: false
-        },
+        // roles: {
+        //     type: DataTypes.JSON,
+        //     allowNull: false
+        // },
         refresh_token: {
             type: DataTypes.STRING(350),
+            allowNull: true
+        },
+        membre_id: {
+            type: DataTypes.BIGINT,
             allowNull: true
         },
     }, { timestamps: true },)

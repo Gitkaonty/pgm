@@ -3,7 +3,7 @@ require('dotenv').config();
 
 const verifyJWT = (req, res, next) => {
     const authHeader = req.headers.authorization || req.headers.Authorization;
-    console.log('authHeader : ', authHeader);
+    //console.log('authHeader : ', authHeader);
 
     if (!authHeader?.startsWith('Bearer '))
         return res.sendStatus(401);

@@ -26,6 +26,7 @@ app.use(express.json());
 app.use(cookieParser());
 // app.use(express.static(path.join(__dirname, '/public')));
 app.use('/public', express.static(path.join(__dirname, '/public')));
+app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
 
 //synchronizing the database and forcing it to false so we dont lose data (ito no ampiasaina ra toa ka executena ny DROP TABLE am sequelize)
 //db.sequelize.sync({ force: true }).then(() => {
@@ -45,13 +46,15 @@ db.sequelize.sync().then(() => {
 //----------------------------------------------------------------------------------------------------------------
 
 //register
-app.use('/register', require('./Routes/registerRoute'));
+app.use('/api/register', require('./Routes/registerRoute'));
 //Login
-app.use('/', require('./Routes/authRoute'));
+app.use('/api/', require('./Routes/authRoute'));
 //refreshToken
-app.use('/refreshToken', require('./Routes/refreshRoute'));
+app.use('/api/refreshToken', require('./Routes/refreshRoute'));
 //logout
-app.use('/logout', require('./Routes/logoutRoute'));
+app.use('/api/logout', require('./Routes/logoutRoute'));
+//change password
+app.use('/api/auth', require('./Routes/changePassword'));
 
 
 
@@ -61,10 +64,42 @@ app.use('/logout', require('./Routes/logoutRoute'));
 
 //routes pour l'authentification
 //app.use('/', userRoutes);
+//----------------------------------------------------------------------------------------------------------------
+// INFOS OECFM
+//----------------------------------------------------------------------------------------------------------------
+app.use('/api/settings-ordre', require('./Routes/oecfm/oecfmRoute'));
 
 //----------------------------------------------------------------------------------------------------------------
-// MENU HOME
+// MENU DASHBOARD
 //----------------------------------------------------------------------------------------------------------------
+app.use('/api/dashboard', require('./Routes/dashboard/dashboardRoute'));
+
+
+//----------------------------------------------------------------------------------------------------------------
+// MENU GESTION DES MEMBRES
+//----------------------------------------------------------------------------------------------------------------
+app.use('/api/membres', require('./Routes/gestionMembre/membreRoute'));
+app.use('/api/membres-updates', require('./Routes/gestionMembre/membreUpdateRoute'));
+app.use('/api/membres-situation', require('./Routes/gestionMembre/membreSituationRoute'));
+
+//--------------------------------------------------------------------------------------------------------
+//MENU PARAMETRES
+//-------------------------------------------------------------------------------------------------------------
+app.use('/api/exercices', require('./Routes/parametres/exerciceRoute'));
+app.use('/api/grille-tarifaire', require('./Routes/parametres/grilleTarifaireRoute'));
+
+
+//--------------------------------------------------------------------------------------------------------
+//MENU COTISATION
+//-------------------------------------------------------------------------------------------------------------
+app.use("/api/cotisations", require('./Routes/cotisation/appelRoute'));
+app.use('/api/paiements', require('./Routes/cotisation/paiementRoute'));
+app.use('/api/compta', require('./Routes/cotisation/grandLivreRoute'));
+
+//--------------------------------------------------------------------------------------------------------
+//MENU ATTESTATION
+//-------------------------------------------------------------------------------------------------------------
+app.use("/api/attestations", require('./Routes/attestation/attestationRoute'));
 
 /*app.all('*', (req,res) => {
     res.status(404);
