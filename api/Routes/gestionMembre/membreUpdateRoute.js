@@ -20,4 +20,19 @@ router.delete('/:id', verifyJWT, membreUpdateController.deleteUpdate);
 //import fichier excel
 router.post('/import-excel', verifyJWT, uploadExcelFile.single('file'), membreUpdateController.importExcelUpdate);
 
+// Récupérer les dernières informations du membre
+router.get('/last/:membre_id', verifyJWT, membreUpdateController.getMembreLastUpdate);
+
+// Liste des dates historisées pour un membre donnéversion/${selectedMembre.id}/${date}
+router.get('/dates/:membre_id', verifyJWT, membreUpdateController.getHistoriqueMembre);
+
+// Récupération des informations du membre pour une date données
+router.get('/version/:membre_id/:date_modif', verifyJWT, membreUpdateController.getMembreByDateInfos);
+
+// Route pour la modification d'une version précise
+router.put('/:membre_id', verifyJWT, membreUpdateController.updateHistoriqueMembre);
+
+//récupérer l' historique
+router.get('/historique/:id', membreUpdateController.getMembreHistorique);
+
 module.exports = router;

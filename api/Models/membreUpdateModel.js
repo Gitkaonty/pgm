@@ -27,6 +27,7 @@ module.exports = (sequelize, DataTypes) => {
         situation: {
             type: DataTypes.ENUM('En activité', 'Inactive', 'Suspendu')
         },
+        diplome: DataTypes.STRING,
         email_oecfm: DataTypes.STRING,
         adresse: DataTypes.TEXT,
         ville: DataTypes.STRING,
@@ -47,7 +48,7 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.ENUM('Expert Comptable', 'Expert Stagiaire')
         },
         titre: {
-            type: DataTypes.ENUM('Tableau A', 'Tableau B')
+            type: DataTypes.ENUM('Tableau A', 'Tableau B','Stagiaire')
         },
         num_compte: DataTypes.STRING,
         nombre_associe: {

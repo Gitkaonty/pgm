@@ -4,7 +4,7 @@ import {
   DialogTitle, IconButton, Stack, Breadcrumbs, Link, 
   Avatar, Chip, Badge, Tooltip, CircularProgress, DialogActions
 } from '@mui/material';
-import { DataGrid, GridActionsCellItem, GridRowModes } from '@mui/x-data-grid';
+import { DataGrid, GridActionsCellItem, GridRowModes, GridToolbar } from '@mui/x-data-grid';
 import { 
   AddOutlined, EditOutlined, DeleteOutlined, 
   SaveOutlined, CloseOutlined, NavigateNext, HomeOutlined,
@@ -222,7 +222,7 @@ const MembresListe = () => {
       width: 80, 
       editable: true,
       type: 'singleSelect',
-      valueOptions: ['M', 'F'],
+      valueOptions: ['M','F'],
       renderCell: (params) => (
         <Chip 
           label={params.value} 
@@ -325,13 +325,13 @@ const MembresListe = () => {
   return (
     <Box sx={{ p: 0 }}>
       <Toaster position="top-right" />
-      <MyBreadcrumbs currentPath="Effectif Total" />
+      <MyBreadcrumbs currentPath="Informations permanentes" />
 
       <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleFileChange} />
 
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main' }}>
-          Effectif de l'Ordre
+          Informations permanentes
         </Typography>
 
         {/* On groupe les boutons dans un sous-Stack pour qu'ils restent collés à droite */}
@@ -355,7 +355,7 @@ const MembresListe = () => {
         </Stack>
       </Stack>
 
-      <Paper elevation={0} sx={{ height: 650, width: '100%', borderRadius: 4, border: '1px solid #eef2f6', overflow: 'hidden' }}>
+      <Paper elevation={0} sx={{ height: 650, width: '100%', borderRadius: 2, border: '1px solid #eef2f6', overflow: 'hidden' }}>
         <DataGrid
           rows={rows}
           columns={columns}
@@ -367,6 +367,13 @@ const MembresListe = () => {
           pageSizeOptions={[10, 25, 50]}
           initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
           disableRowSelectionOnClick
+          slots={{ toolbar: GridToolbar }} 
+          slotProps={{
+              toolbar: {
+                  showQuickFilter: true, // Affiche le champ de recherche
+                  quickFilterProps: { debounceMs: 500 }, // Optionnel : attend 500ms avant de filtrer
+              },
+          }}
           sx={{ 
             border: 'none',
             '& .MuiDataGrid-columnHeaders': { bgcolor: '#f8fafb', borderBottom: '1px solid #eef2f6' },

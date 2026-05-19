@@ -37,6 +37,10 @@ module.exports = (sequelize, Sequelize) => {
             type: Sequelize.DECIMAL(15, 2), 
             defaultValue: 0 
         },
+         validation_0: { 
+            type: Sequelize.BOOLEAN, 
+            defaultValue: false 
+        },
         validation_1: { 
             type: Sequelize.BOOLEAN, 
             defaultValue: false 

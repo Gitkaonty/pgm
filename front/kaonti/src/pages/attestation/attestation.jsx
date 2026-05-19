@@ -3,7 +3,10 @@ import axios from 'axios'; // Import de axios pour le back
 import {
     Box, Typography, TextField, InputAdornment, Card, Stack,
     Avatar, Chip, LinearProgress, Grid, IconButton, Tooltip,
-    Breadcrumbs, Link
+    Breadcrumbs, Link,
+    CircularProgress,
+    Alert,
+    AlertTitle
 } from '@mui/material';
 import {
     Search, FilterList, CheckCircle, MoreVert,
@@ -23,6 +26,8 @@ import { Toaster } from 'react-hot-toast';
 import { Tabs, Tab } from '@mui/material';
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, Image } from '@react-pdf/renderer';
 import PdfAttestationExpA from './pdf_attestation';
+import { pdf } from '@react-pdf/renderer';
+import { InfoOutlined } from '@mui/icons-material';
 
 const GREEN_MAIN = '#435844';
 const GREEN_ACCENT = '#8BC34A';
@@ -49,10 +54,12 @@ const DemandeAttestationModal = ({ open, onClose, membres, exercices, onRefresh 
     const axiosPrivate = useAxiosPrivate();
     const [selectedMembre, setSelectedMembre] = useState(null);
     const [selectedExo, setSelectedExo] = useState(null);
+    const [load, setLoad] = useState(false);
 
     const handleDemander = async () => {
         if (!selectedMembre || !selectedExo) return;
         try {
+            setLoad(true);
             await axiosPrivate.post('/api/attestations/create', {
                 membre_id: selectedMembre.id,
                 exercice_id: selectedExo.id
@@ -61,6 +68,7 @@ const DemandeAttestationModal = ({ open, onClose, membres, exercices, onRefresh 
             onClose(); // Ferme la modal
             setSelectedMembre(null);
             setSelectedExo(null);
+            setLoad(false);
         } catch (err) {
             toast.error("Erreur lors de la demande");
         }
@@ -89,7 +97,6 @@ const DemandeAttestationModal = ({ open, onClose, membres, exercices, onRefresh 
                         getOptionLabel={(option) => {
                             if (!option) return "";
 
-                            // Formatage des dates en dd/mm/yyyy
                             const debut = option.date_debut ? new Date(option.date_debut).toLocaleDateString('fr-FR') : '...';
                             const fin = option.date_fin ? new Date(option.date_fin).toLocaleDateString('fr-FR') : '...';
 
@@ -101,16 +108,47 @@ const DemandeAttestationModal = ({ open, onClose, membres, exercices, onRefresh 
                             <TextField {...params} label="Exercice concerné" variant="outlined" />
                         )}
                     />
+
+                    {/* NOTICE INFORMATION COMPLETE SUR LES CIRCUITS */}
+                    
+                        <Alert 
+                            icon={<InfoOutlined fontSize="medium" />} 
+                            severity="info"
+                            sx={{ 
+                                borderRadius: 2, 
+                                bgcolor: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                                color: '#334155',
+                                '& .MuiAlert-icon': {
+                                    color: '#435844'
+                                }
+                            }}
+                        >
+                            <AlertTitle sx={{ fontWeight: 700, fontSize: '0.9rem', color: '#1e293b', mb: 1 }}>
+                                Rappel du circuit des validations
+                            </AlertTitle>
+                            
+                            <Stack spacing={1}>
+                                <Typography variant="body2" sx={{ fontSize: '0.85rem', lineHeight: 1.4 }}>
+                                    • <strong>Si le solde est positif :</strong> La demande passe d'abord par le <strong>Secrétaire</strong>, puis le <strong>Secrétaire Général (SG)</strong>, et enfin le <strong>Président</strong>.
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontSize: '0.85rem', lineHeight: 1.4 }}>
+                                    • <strong>Si le solde est nul ou négatif (à jour) :</strong> La demande est transmise directement au <strong>Secrétaire Général (SG)</strong>, puis au <strong>Président</strong>.
+                                </Typography>
+                            </Stack>
+                        </Alert>
+                   
                 </Stack>
             </DialogContent>
 
             <DialogActions sx={{ p: 3 }}>
-                <Button onClick={onClose} sx={{ color: 'text.secondary', fontWeight: 700 }}>
+                <Button onClick={onClose} sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'none' }}>
                     Annuler
                 </Button>
                 <Button
                     variant="contained"
                     onClick={handleDemander}
+                    disabled={!selectedMembre || !selectedExo}
                     sx={{
                         bgcolor: '#435844',
                         '&:hover': { bgcolor: '#354736' },
@@ -120,7 +158,7 @@ const DemandeAttestationModal = ({ open, onClose, membres, exercices, onRefresh 
                         textTransform: 'none'
                     }}
                 >
-                    Demander
+                    {load ? <CircularProgress size={16} /> : 'Demander'}
                 </Button>
             </DialogActions>
         </Dialog>
@@ -130,6 +168,7 @@ const DemandeAttestationModal = ({ open, onClose, membres, exercices, onRefresh 
 
 const AttestationCard = ({ data, onRefresh, orderInfo }) => {
     const [openDelete, setOpenDelete] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     const axiosPrivate = useAxiosPrivate();
     // Calcul basé sur tes colonnes validation_1 et validation_2
@@ -143,6 +182,28 @@ const AttestationCard = ({ data, onRefresh, orderInfo }) => {
             setOpenDelete(false);
         } catch (err) {
             toast.error(err.response?.data?.message || "Erreur lors de la suppression");
+        }
+    };
+
+    //imprimer l'attestation
+    const handlePrintAttestation = async (data, orderInfo) => {
+        try {
+            setLoading(true);
+            const doc = (
+                <PdfAttestationExpA 
+                rows={data} 
+                infoSignataire={orderInfo} 
+                />
+            );
+
+            // 3. On crée un Blob et on l'ouvre dans un nouvel onglet
+            const blob = await pdf(doc).toBlob();
+            const url = window.URL.createObjectURL(blob);
+            window.open(url, '_blank');
+            setLoading(false);
+        } catch (error) {
+            console.error("Erreur impression:", error);
+            toast.error("Impossible de générer le PDF");
         }
     };
 
@@ -310,23 +371,19 @@ const AttestationCard = ({ data, onRefresh, orderInfo }) => {
                                 </IconButton>
                             ) : (
                                 /* 2. Version active (Le lien n'existe que quand c'est prêt) */
-                                <PDFDownloadLink
-                                    document={<PdfAttestationExpA rows={data} infoSignataire={orderInfo} />}
-                                    fileName={`Export_Attestation.pdf`}
-                                    style={{ textDecoration: 'none' }}
+                               
+                                <IconButton
+                                    onClick={() => handlePrintAttestation(data, orderInfo)}
+                                    sx={{
+                                        bgcolor: '#f5f5f5',
+                                        color: GREEN_MAIN,
+                                        border: '1px solid #e0e4e7',
+                                        borderRadius: 2,
+                                        '&:hover': { bgcolor: '#eeeeee' }
+                                    }}
                                 >
-                                    <IconButton
-                                        sx={{
-                                            bgcolor: '#f5f5f5',
-                                            color: GREEN_MAIN,
-                                            border: '1px solid #e0e4e7',
-                                            borderRadius: 2,
-                                            '&:hover': { bgcolor: '#eeeeee' }
-                                        }}
-                                    >
-                                        <PrintOutlined fontSize="small" />
-                                    </IconButton>
-                                </PDFDownloadLink>
+                                    {loading ? <CircularProgress size={16} /> : <PrintOutlined fontSize="small" />}
+                                </IconButton>
                             )}
                         </span>
                     </Tooltip>

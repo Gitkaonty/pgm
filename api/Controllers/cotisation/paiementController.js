@@ -93,7 +93,8 @@ exports.createPaiement = async (req, res) => {
             payeAnouveau,
             payeCotisation,
             payeAutre,
-            mode
+            mode,
+            reference
         } = req.body;
 
         // 1. Correction du nom (Utilise le Modèle avec Majuscule : Exercice)
@@ -133,6 +134,7 @@ exports.createPaiement = async (req, res) => {
             autre_appel: payeAutre || 0,
             total: parseFloat(payeAnouveau || 0) + parseFloat(payeCotisation || 0) + parseFloat(payeAutre || 0),
             mode_reglement: mode,
+            reference:reference,
             num_auto: nextSeq, // On utilise la variable calculée plus haut
             num_ticket: referenceFinale,
             valide: false

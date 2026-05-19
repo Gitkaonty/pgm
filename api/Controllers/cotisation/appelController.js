@@ -57,7 +57,9 @@ exports.getAppelsByExercice = async (req, res) => {
                     attributes: ['id'] // On ne prend que l'ID pour optimiser la requête
                 }
             ],
-            order: [['id', 'ASC']]
+            order: [
+                [{ model: db.membres, as: 'membre' }, 'nom', 'ASC']
+            ],
         });
 
         // On renvoie les données telles quelles (ou presque) au DataGrid
@@ -457,24 +459,26 @@ exports.deleteAppel = async (req, res) => {
 // Génération des ajustements avec montant forfaitaire et filtres
 exports.generateAjustements = async (req, res) => {
     const { exerciceId, montant, section, titre, statut, membre } = req.body;
-    const transaction = await db.sequelize.transaction();
+    
+    // 1. Vérifications avant d'ouvrir la transaction (pour économiser le pool)
+    if (!membre) { // Vérifie null, undefined ou 0
+        return res.status(400).json({ message: "Veuillez sélectionner un membre" });
+    }
+
+    let transaction;
 
     try {
-        // 1. Récupérer l'exercice pour avoir la date de fin
-        const exercice = await db.exercices.findByPk(exerciceId);
+        // 2. Ouvrir la transaction seulement quand on commence le travail sérieux
+        transaction = await db.sequelize.transaction();
+
+        const exercice = await db.exercices.findByPk(exerciceId, { transaction });
         if (!exercice) {
+            await transaction.rollback(); // Toujours rollback avant un return dans un try
             return res.status(404).json({ message: "Exercice non trouvé" });
         }
 
-        // Supprimer les brouillons existants pour cet exercice
-        //await db.ajustementappels.destroy({ where: { exercice_id: exerciceId } });
-
-        // 2. Exécuter ta requête SQL brute de situation
-        // On utilise QueryTypes.SELECT pour avoir un tableau d'objets propre
         const situationMembres = await db.sequelize.query(`
-            SELECT 
-                m.id, m.matricule, m.nom, m.prenom,
-                u.section, u.statut, u.titre
+            SELECT m.id, m.matricule, m.nom, m.prenom, u.section, u.statut, u.titre, u.nombre_associe
             FROM membresidentites m
             LEFT JOIN membres_updates u ON u.id = (
                 SELECT id FROM membres_updates 
@@ -485,10 +489,10 @@ exports.generateAjustements = async (req, res) => {
             ORDER BY m.nom ASC
         `, {
             replacements: { dateFin: exercice.date_fin },
-            type: QueryTypes.SELECT
+            type: db.sequelize.QueryTypes.SELECT,
+            transaction // On passe la transaction ici aussi
         });
 
-        // 3. Filtrage JS (Simple et efficace)
         const membresFiltrés = situationMembres.filter(m => {
             const matchSection = section === "Toutes" || m.section === section;
             const matchTitre = titre === "Toutes" || m.titre === titre;
@@ -498,37 +502,40 @@ exports.generateAjustements = async (req, res) => {
         });
 
         if (membresFiltrés.length === 0) {
+            await transaction.rollback();
             return res.status(400).json({ message: "Aucun membre ne correspond aux filtres." });
         }
 
-        // 4. Préparer les objets pour l'insertion
         const dataAInserer = membresFiltrés.map(m => ({
-            exercice_id: exerciceId, // vérifie si c'est exerciceId ou exercice_id dans ta base
+            exercice_id: exerciceId,
             membre_id: m.id,
-            // matricule: m.matricule,
-            // nom: m.nom,
-            // prenom: m.prenom,
-            motif: m.motif || "n/a",
+            motif: "Ajustement manuel",
             section: m.section || "n/a",
             statut: m.statut || "n/a",
             titre: m.titre || "n/a",
+            associe:m.nombre_associe,
             montant_ajustement: parseFloat(montant),
             valide: false,
-            type_ajustement: "AJUSTEMENT",
-            // createdAt: new Date(),
-            // updatedAt: new Date()
+            type_ajustement: "AJUSTEMENT"
         }));
 
-        // 5. Insertion en masse avec Sequelize
-        await db.ajustementappels.bulkCreate(dataAInserer);
+        // Insertion en masse
+        await db.ajustementappels.bulkCreate(dataAInserer, { transaction });
 
-        res.json({
-            message: `${membresFiltrés.length} ajustements générés.`
-        });
+        // 3. IMPORTANT : Valider les changements et LIBÉRER la connexion
+        await transaction.commit();
+
+        res.json({ message: `${membresFiltrés.length} ajustements générés.` });
 
     } catch (error) {
+        // 4. En cas d'erreur, on annule tout et on LIBÈRE la connexion
+        if (transaction) await transaction.rollback();
+        
         console.error("Erreur Backend:", error);
-        res.status(500).json({ message: "Erreur serveur lors de la génération." });
+        res.status(500).json({ 
+            message: "Erreur serveur lors de la génération.",
+            details: error.message 
+        });
     }
 };
 
@@ -546,7 +553,7 @@ exports.getAjustementsByExercice = async (req, res) => {
             SELECT 
                 a.id, a.exercice_id, a.membre_id, a.montant_ajustement, a.valide, a.type_ajustement,
                 m.matricule, m.nom, m.prenom,
-                u.section, u.statut, u.titre
+                a.section, a.statut, a.titre, a.associe
             FROM ajustementappels a
             INNER JOIN membresidentites m ON a.membre_id = m.id
             LEFT JOIN membres_updates u ON u.id = (

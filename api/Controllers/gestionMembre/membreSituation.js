@@ -25,6 +25,7 @@ const getMembreSituation = async (req, res) => {
         m.promotion,
         m.photo_url, -- Ajout de la photo depuis la table identité
         u.date_edition,
+        u.diplome,
         u.date_modification,
         u.membre_active, 
         u.situation, 

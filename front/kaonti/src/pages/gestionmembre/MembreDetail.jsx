@@ -1,13 +1,27 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'; // Ajout de useRef
-import { 
-  Box, Button, Typography, Paper, Stack, Chip, Breadcrumbs, Link,
-  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions 
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import {
+  Box, Button, Typography, Paper, Stack, Breadcrumbs, Link,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  Drawer, Divider, IconButton, TextField, MenuItem, Grid,
+  Avatar, InputAdornment, Card,
+  Chip,
+  TableContainer,
+  Table,
+  TableBody,
+  TableRow,
+  TableCell
 } from '@mui/material';
-import { DataGrid, GridActionsCellItem, GridRowModes } from '@mui/x-data-grid';
-import { 
-  AddOutlined, EditOutlined, DeleteOutlined, SaveOutlined, 
-  CloseOutlined, NavigateNext, HomeOutlined, FileUploadOutlined, // Ajout FileUploadOutlined
-  FileDownloadOutlined
+import { DataGrid } from '@mui/x-data-grid';
+import {
+  HistoryOutlined, EditNoteOutlined, NavigateNext, HomeOutlined,
+  FileUploadOutlined, CloseOutlined, SaveOutlined,
+  SearchOutlined, ArrowForwardOutlined,
+  BusinessCenterOutlined,
+  LocationOnOutlined, AlternateEmailOutlined,
+  PersonOutline,
+  DeleteOutline,
+  FileDownloadOutlined,
+  ArrowForwardIosOutlined
 } from '@mui/icons-material';
 import toast, { Toaster } from 'react-hot-toast';
 import useAxiosPrivate from '../../../config/axiosPrivate';
@@ -21,76 +35,615 @@ const MyBreadcrumbs = ({ currentPath }) => (
   </Breadcrumbs>
 );
 
-const MembreMiseAJour = () => {
+const FastTextField = ({ label, value, onSave, ...props }) => {
+  const [localValue, setLocalValue] = React.useState(value);
+
+  // Si la valeur change (ex: sélection d'une version), on met à jour l'état local
+  React.useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  return (
+    <TextField
+      {...props}
+      label={label}
+      value={localValue || ''}
+      onChange={(e) => setLocalValue(e.target.value)} // Ultra rapide car local
+      onBlur={() => onSave(localValue)} // Enregistre dans le vrai formData quand on sort
+    />
+  );
+};
+
+// --- COMPOSANTS UTILITAIRES POUR LE DESIGN DU FORMULAIRE ---
+
+const InfoBlock = ({ title, icon, children }) => (
+  <Box sx={{ mb: 3 }}>
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2, color: '#1e293b' }}>
+      {icon}
+      <Typography variant="subtitle2" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {title}
+      </Typography>
+    </Stack>
+    <Paper elevation={0} sx={{ p: 2, bgcolor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+      {children}
+    </Paper>
+  </Box>
+);
+
+// Options pour les Listbox (à adapter selon tes besoins réels)
+const options = {
+  section: ['Expert Comptable', 'Société Expert'],
+  statut: ['Expert Comptable', 'Expert Stagiaire'],
+  titre: ['Tableau A', 'Tableau B', 'Stagiaire'],
+  poste: ['Caissier', 'Conseiller', 'Membre', 'Président', 'Président d honneur', 'Vice-Président Administratif', 'Vice-Président Technique', 'Secrétaire Exécutif', 'Secrétaire Général', 'Secrétaire Général Adjoint', 'Trésorier'],
+  situation: ['En activité', 'Inactive', 'Suspendu'],
+  sexe: [{ val: 'M', lab: 'Masculin' }, { val: 'F', lab: 'Féminin' }],
+  active: ['Oui', 'Non']
+};
+
+const EditMembreDrawer = ({ open, onClose, formData, setFormData, onSave, onFinalSubmit, datesHistorique, selectedDate, handleVersionChange, onDeleteVersion }) => {
+  const [openConfirmDelete, setOpenConfirmDelete] = useState(false);
+
+  const handleChange = (field) => (e) => {
+    setFormData({ ...formData, [field]: e.target.value });
+  };
+
+  // Cette fonction s'exécute uniquement quand on quitte le champ
+  const handleBlur = (field) => (e) => {
+    const newValue = e.target.value;
+    // On ne met à jour que si la valeur a vraiment changé
+    if (formData[field] !== newValue) {
+      setFormData({ ...formData, [field]: newValue });
+    }
+  };
+
+  const confirmAndFieldDelete = () => {
+    onDeleteVersion(); // Appel de la fonction de suppression réelle
+    setOpenConfirmDelete(false); // Fermeture de la popup après l'appel
+  };
+
+  return (
+    <Drawer
+      anchor="right"
+      open={open}
+      onClose={onClose}
+      PaperProps={{ sx: { width: { xs: '100%', sm: 600 }, border: 'none', bgcolor: '#f8fafc' } }}
+    >
+      {formData && (
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+
+          {/* HEADER DYNAMIQUE */}
+          <Box sx={{ p: 4, background: 'linear-gradient(135deg, #1d4634 0%, #2d6a4f 100%)', color: 'white', position: 'relative' }}>
+            <IconButton
+              onClick={() => setOpenUpdate(false)}
+              sx={{ position: 'absolute', right: 12, top: 12, color: 'rgba(255,255,255,0.7)' }}
+            >
+              <CloseOutlined />
+            </IconButton>
+            <Stack direction="row" spacing={3} alignItems="center">
+              <Avatar
+                src={formData.photo_url ? `http://localhost:5100/uploads/profiles/${formData.photo_url}` : ''}
+                sx={{ width: 80, height: 80, border: '4px solid rgba(255,255,255,0.2)', boxShadow: '0 8px 20px rgba(0,0,0,0.3)' }}
+              >
+                {formData.nom?.charAt(0)}
+              </Avatar>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 800, mb: 0 }}>Modification Profil</Typography>
+                <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                  {formData.nom} {formData.prenom}
+                </Typography>
+                <Chip
+                  label={`Matricule: ${formData.matricule}`}
+                  size="small"
+                  sx={{ mt: 1, bgcolor: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 700 }}
+                />
+              </Box>
+            </Stack>
+          </Box>
+
+          {/* CORPS DU FORMULAIRE */}
+          <Box sx={{ p: 2, flex: 1, overflowY: 'auto' }}>
+
+            {/* Sélecteur de versions existantes */}
+            <Grid item xs={selectedDate === 'new' ? 6 : 12}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>
+                HISTORIQUE DES MODIFICATIONS
+              </Typography>
+
+              <Stack direction="row" spacing={1} alignItems="flex-start">
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  value={selectedDate}
+                  onChange={(e) => handleVersionChange(e.target.value)}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px', bgcolor: '#f1f5f9', mb: 3 } }}
+                >
+                  <MenuItem value="new" sx={{ fontWeight: 700, color: '#2d6a4f' }}>
+                    + NOUVELLE MISE À JOUR
+                  </MenuItem>
+                  <Divider />
+                  {datesHistorique.map((d) => (
+                    <MenuItem key={d.date_modification} value={d.date_modification}>
+                      Version du {new Date(d.date_modification).toLocaleDateString('fr-FR')}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <IconButton
+                  color="error"
+                  disabled={selectedDate === 'new'} // Désactivé si "new"
+                  onClick={() => setOpenConfirmDelete(true)} // Ouvre la popup
+                  sx={{ bgcolor: '#fff1f0', '&:hover': { bgcolor: '#ffccc7' }, borderRadius: '8px' }}
+                >
+                  <DeleteOutline />
+                </IconButton>
+              </Stack>
+            </Grid>
+
+            {selectedDate === 'new' ?
+              <Grid item xs={6}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>DATE DE MODIFICATION</Typography>
+                <TextField sx={{ width: 200 }} fullWidth size="small" type="date" value={formData.date_modification || ''} onChange={handleChange('date_modification')} />
+              </Grid>
+              : null
+            }
+
+            <Box sx={{ mb: 3 }}></Box>
+
+            {/* 1. ADMINISTRATION (AVEC LISTBOX) */}
+            <InfoBlock title="Situation OECFM" icon={<BusinessCenterOutlined />}>
+              <Grid container spacing={2}>
+                {[
+                  { id: 'situation', label: 'Situation', type: 'select', opt: options.situation },
+                  { id: 'statut', label: 'Statut', type: 'select', opt: options.statut },
+                  { id: 'section', label: 'Section', type: 'select', opt: options.section },
+                  { id: 'titre', label: 'Titre', type: 'select', opt: options.titre },
+                  { id: 'poste', label: 'Poste occupé', type: 'select', opt: options.poste },
+                  { id: 'promotion', label: 'Promotion', type: 'text' },
+                  { id: 'membre_active', label: 'Membre Actif', type: 'select', opt: options.active },
+                  { id: 'date_adhesion', label: "Date d'adhésion", type: 'date' },
+                ].map((item) => (
+                  <Grid item xs={6} key={item.id}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>
+                      {item.label.toUpperCase()}
+                    </Typography>
+                    <TextField
+                      select={item.type === 'select'}
+                      fullWidth size="small"
+                      type={item.type === 'date' ? 'date' : 'text'}
+                      value={formData[item.id] || ''}
+                      onChange={handleChange(item.id)}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+                    >
+                      {item.type === 'select' && item.opt.map((o) => (
+                        <MenuItem key={o} value={o}>{o}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                ))}
+
+                <Grid item xs={12}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>DIPLOME</Typography>
+                  <FastTextField
+                    fullWidth size="small"
+                    value={formData.diplome || ''}
+                    onChange={handleChange('diplome')}
+                    onSave={(val) => setFormData({ ...formData, diplome: val })}
+                  />
+                </Grid>
+              </Grid>
+            </InfoBlock>
+
+            {/* 2. CONTACTS & COMPTES */}
+            <InfoBlock title="Contacts & Finances" icon={<AlternateEmailOutlined />}>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>EMAIL OECFM</Typography>
+                  <FastTextField
+                    fullWidth size="small"
+                    value={formData.email_oecfm || ''}
+                    onChange={handleChange('email_oecfm')}
+                    onSave={(val) => setFormData({ ...formData, email_oecfm: val })}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>EMAIL PRO.</Typography>
+                  <FastTextField
+                    fullWidth
+                    size="small"
+                    value={formData.email_professionnel || ''}
+                    onChange={handleChange('email_professionnel')}
+                    onSave={(val) => setFormData({ ...formData, email_professionnel: val })}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>EMAIL PERSO.</Typography>
+                  <FastTextField
+                    fullWidth size="small"
+                    value={formData.email_personnel || ''}
+                    onChange={handleChange('email_personnel')}
+                    onSave={(val) => setFormData({ ...formData, email_personnel: val })}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>TÉLÉPHONE</Typography>
+                  <FastTextField
+                    fullWidth size="small"
+                    value={formData.telephone || ''}
+                    onChange={handleChange('telephone')}
+                    onSave={(val) => setFormData({ ...formData, telephone: val })}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>FAX</Typography>
+                  <FastTextField fullWidth size="small" value={formData.fax || ''}
+                    onChange={handleChange('fax')}
+                    onSave={(val) => setFormData({ ...formData, fax: val })}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>N° COMPTE</Typography>
+                  <FastTextField fullWidth size="small"
+                    value={formData.num_compte || ''}
+                    onChange={handleChange('num_compte')}
+                    onSave={(val) => setFormData({ ...formData, num_compte: val })}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>NB ASSOCIÉS</Typography>
+                  <TextField fullWidth size="small" type="number"
+                    value={formData.nombre_associe || ''}
+                    onChange={handleChange('nombre_associe')}
+                    onSave={(val) => setFormData({ ...formData, nombre_associe: val })}
+                  />
+                </Grid>
+              </Grid>
+            </InfoBlock>
+
+            {/* 3. LOCALISATION */}
+            <InfoBlock title="Localisation" icon={<LocationOnOutlined />}>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>ADRESSE</Typography>
+                  <FastTextField fullWidth multiline
+                    rows={2} value={formData.adresse || ''}
+                    onChange={handleChange('adresse')}
+                    onSave={(val) => setFormData({ ...formData, adresse: val })}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>VILLE</Typography>
+                  <FastTextField fullWidth
+                    size="small" value={formData.ville || ''}
+                    onChange={handleChange('ville')}
+                    onSave={(val) => setFormData({ ...formData, ville: val })}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>RÉGION</Typography>
+                  <FastTextField fullWidth size="small"
+                    value={formData.region || ''}
+                    onChange={handleChange('region')}
+                    onSave={(val) => setFormData({ ...formData, region: val })}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>CODE POSTAL</Typography>
+                  <FastTextField fullWidth size="small"
+                    value={formData.code_postal || ''}
+                    onChange={handleChange('code_postal')}
+                    onSave={(val) => setFormData({ ...formData, code_postal: val })}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>BOITE POSTALE</Typography>
+                  <FastTextField fullWidth size="small"
+                    value={formData.boite_postale || ''}
+                    onChange={handleChange('boite_postale')}
+                    onSave={(val) => setFormData({ ...formData, boite_postale: val })}
+                  />
+                </Grid>
+              </Grid>
+            </InfoBlock>
+
+            {/* 4. IDENTITÉ PERSONNELLE */}
+            <InfoBlock title="Identité & État Civil" icon={<PersonOutline />}>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>SEXE</Typography>
+                  <TextField disabled select fullWidth size="small" value={formData.sexe || ''} onChange={handleChange('sexe')}>
+                    {options.sexe.map(s => <MenuItem key={s.val} value={s.val}>{s.lab}</MenuItem>)}
+                  </TextField>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>DATE DE NAISSANCE</Typography>
+                  <TextField disabled fullWidth size="small" type="date" value={formData.date_naissance || ''} onChange={handleChange('date_naissance')} />
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>LIEU DE NAISSANCE</Typography>
+                  <TextField fullWidth size="small"
+                    disabled
+                    value={formData.lieu_naissance || ''}
+                  //onChange={handleChange('lieu_naissance')}
+                  //onSave={(val) => setFormData({ ...formData, lieu_naissance: val })}
+                  />
+                </Grid>
+                <Grid item xs={12}><Divider sx={{ my: 1 }} /></Grid>
+                <Grid item xs={12}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>N° CIN</Typography>
+                  <TextField fullWidth size="small"
+                    disabled
+                    value={formData.cin || ''}
+                  //onChange={handleChange('cin')}
+                  //onSave={(val) => setFormData({ ...formData, cin: val })}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>DÉLIVRÉ LE</Typography>
+                  <TextField disabled fullWidth size="small" type="date" value={formData.date_cin || ''} onChange={handleChange('date_cin')} />
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>À (LIEU CIN)</Typography>
+                  <TextField fullWidth size="small"
+                    disabled
+                    value={formData.lieu_cin || ''}
+                  //onChange={handleChange('lieu_cin')}
+                  //onSave={(val) => setFormData({ ...formData, lieu_cin: val })}
+                  />
+                </Grid>
+              </Grid>
+            </InfoBlock>
+          </Box>
+
+          {/* ACTIONS */}
+          <Box sx={{ p: 3, bgcolor: 'white', borderTop: '1px solid #e2e8f0' }}>
+            <Stack direction="row" spacing={2}>
+              <Button fullWidth variant="outlined" onClick={onClose} sx={{ borderRadius: '12px', py: 1.5, textTransform: 'none', fontWeight: 700, color: '#64748b' }}>
+                Annuler
+              </Button>
+              <Button
+                fullWidth variant="contained"
+                startIcon={<SaveOutlined />}
+                onClick={onFinalSubmit}
+                sx={{ bgcolor: '#1d4634', borderRadius: '12px', py: 1.5, textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#1e293b' } }}
+              >
+                Sauvegarder les modifications
+              </Button>
+            </Stack>
+          </Box>
+
+          <Dialog open={openConfirmDelete} onClose={() => setOpenConfirmDelete(false)}>
+            <DialogTitle>Supprimer cette version ?</DialogTitle>
+            <DialogContent>
+              <Typography>
+                Êtes-vous sûr de vouloir supprimer l'historique du {new Date(selectedDate).toLocaleDateString('fr-FR')} ?
+                Cette action est irréversible.
+              </Typography>
+            </DialogContent>
+            <DialogActions sx={{ p: 2 }}>
+              <Button onClick={() => setOpenConfirmDelete(false)} color="inherit">Annuler</Button>
+              <Button
+                onClick={confirmAndFieldDelete}
+                color="error"
+                variant="contained"
+                startIcon={<DeleteOutline />}
+              >
+                Supprimer définitivement
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </Box>
+      )}
+    </Drawer>
+  );
+};
+
+const MembreMiseAJourPro = () => {
   const axiosPrivate = useAxiosPrivate();
+
+  // --- ÉTATS PRINCIPAUX ---
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [rowModesModel, setRowModesModel] = useState({});
-  const [listeMembres, setListeMembres] = useState([]);
+  const [searchText, setSearchText] = useState('');
 
-  // États pour la suppression
-  const [openConfirm, setOpenConfirm] = useState(false);
-  const [deleteId, setDeleteId] = useState(null);
+  // --- ÉTATS DRAWERS ---
+  const [openHistory, setOpenHistory] = useState(false);
+  const [openUpdate, setOpenUpdate] = useState(false);
 
-  // --- ÉTATS POUR L'IMPORT EXCEL ---
+  // --- ÉTATS DONNÉES SÉLECTIONNÉES ---
+  const [selectedMembre, setSelectedMembre] = useState(null);
+  const [historique, setHistorique] = useState([]); // <--- C'était la cause de l'erreur
+  const [formData, setFormData] = useState({});
+
+  // --- ÉTATS IMPORT ---
   const [openImport, setOpenImport] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const excelInputRef = useRef(null);
 
-  // --- Helper pour les Badges (Style Bouton SaaS) ---
-  const renderBadge = (params, colorMap) => {
-    if (!params.value) return '';
-    const color = colorMap[params.value] || '#757575';
-    return (
-      <Chip 
-        label={params.value} 
-        size="small" 
-        sx={{ 
-          bgcolor: `${color}15`, 
-          color: color, 
-          fontWeight: 700, 
-          fontSize: '0.7rem',
-          borderRadius: '6px',
-          border: `1px solid ${color}30`,
-          height: 20
-        }} 
-      />
+  const [datesHistorique, setDatesHistorique] = useState([]);
+  const [selectedDate, setSelectedDate] = useState('new'); // 'new' par défaut
+
+  // --- LOGIQUE DE COMPARAISON (TRACER) ---
+  const getDiffFields = (current, previous) => {
+    if (!previous) return [];
+    const exclude = ['id', 'createdAt', 'updatedAt', 'date_modification', 'date_edition'];
+    return Object.keys(current).filter(key => 
+      !exclude.includes(key) && String(current[key]) !== String(previous[key])
     );
   };
 
-  useEffect(() => {
-    const getMembres = async () => {
-      try {
-        const res = await axiosPrivate.get('/api/membres');
-        setListeMembres(res.data.map(m => ({ value: Number(m.id), label: `${m.nom || ''} ${m.prenom || ''}`.trim() })));
-      } catch (err) { 
-        console.error(err);
+  // 1. Charger la liste des dates disponibles pour ce membre
+  const fetchDatesVersions = async (membreId) => {
+    try {
+      const res = await axiosPrivate.get(`/api/membres-updates/dates/${membreId}`);
+      if (res.data && res.data.length > 0) {
+        setDatesHistorique(res.data);
+        // On sélectionne la date la plus récente
+        setSelectedDate(res.data[0].date_modification);
+      } else {
+        // Si pas d'historique, on bascule sur "nouvelle" par défaut
+        setDatesHistorique([]);
+        setSelectedDate('new');
       }
-    };
-    getMembres();
-  }, [axiosPrivate]);
+    } catch (err) {
+      console.error("Erreur dates:", err);
+    }
+  };
 
-  const fetchUpdates = useCallback(async () => {
+  // --- CHARGEMENT DES DONNÉES ---
+  const fetchMembres = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axiosPrivate.get('/api/membres-updates');
+      const response = await axiosPrivate.get('/api/membres');
       setRows(response.data);
-    } catch (error) { 
-      console.error(error);
-      toast.error("Erreur de chargement des mises à jour");
+    } catch (error) {
+      toast.error("Erreur de chargement des membres");
+    } finally {
+      setLoading(false);
     }
-    finally { setLoading(false); }
   }, [axiosPrivate]);
 
-  useEffect(() => { fetchUpdates(); }, [fetchUpdates]);
+  useEffect(() => { fetchMembres(); }, [fetchMembres]);
 
-  const handleAddNew = () => {
-    const id = Math.floor(Math.random() * 1000000);
-    const today = new Date().toISOString().split('T')[0];
-    const newRow = { id, date_edition: today, date_modification: today, membre_active: 'Oui', situation: 'En activité', isNew: true };
-    setRows((old) => [newRow, ...old]);
-    setRowModesModel((old) => ({ ...old, [id]: { mode: GridRowModes.Edit, fieldToFocus: 'membre_id' } }));
+  // 2. Charger les données d'une version précise
+  const handleVersionChange = async (date) => {
+    setSelectedDate(date);
+    if (date === 'new') {
+      // Si "Nouvelle date", on peut soit vider, soit garder les dernières infos connues
+      setFormData({ ...formData, date_modification: new Date().toISOString().split('T')[0] });
+      return;
+    }
+
+    try {
+      const res = await axiosPrivate.get(`/api/membres-updates/version/${selectedMembre.id}/${date}`);
+      const versionData = res.data[0] || {};
+      setFormData({ ...versionData }); // On écrase le formulaire avec les vieilles données
+    } catch (err) {
+      toast.error("Erreur de récupération de la version");
+    }
   };
+
+  // --- ACTIONS ---
+  const handleViewHistory = async (membre) => {
+    setSelectedMembre(membre);
+    try {
+      const res = await axiosPrivate.get(`/api/membres-updates/historique/${membre.id}`);
+      setHistorique(res.data);
+      setOpenHistory(true);
+    } catch (err) {
+      toast.error("Erreur lors du chargement de l'historique");
+    }
+  };
+
+  const handleOpenUpdate = async (membre) => {
+    setSelectedMembre(membre);
+    try {
+      const res = await axiosPrivate.get(`/api/membres-updates/last/${membre.id}`);
+      const lastData = res.data[0] || {};
+
+      fetchDatesVersions(membre.id);
+
+      setFormData({
+        id: lastData.id,
+        membre_id: membre.id,
+        adresse: lastData.adresse,
+        boite_postale: lastData.boite_postale,
+        cin: lastData.cin,
+        code_postal: lastData.code_postal,
+        date_adhesion: lastData.date_adhesion,
+        date_cin: lastData.date_cin,
+        date_edition: lastData.date_edition,
+        date_modification: lastData.date_modification,
+        diplome: lastData.diplome,
+        date_naissance: lastData.date_naissance,
+        email_oecfm: lastData.email_oecfm,
+        email_personnel: lastData.email_personnel,
+        email_professionnel: lastData.email_professionnel,
+        fax: lastData.fax,
+        lieu_cin: lastData.lieu_cin,
+        lieu_naissance: lastData.lieu_naissance,
+        matricule: lastData.matricule,
+        membre_active: lastData.membre_active,
+        nom: lastData.nom,
+        nombre_associe: lastData.nombre_associe,
+        num_compte: lastData.num_compte,
+        photo_url: lastData.photo_url,
+        poste: lastData.poste,
+        prenom: lastData.prenom,
+        promotion: lastData.promotion,
+        region: lastData.region,
+        section: lastData.section,
+        sexe: lastData.sexe,
+        situation: lastData.situation,
+        statut: lastData.statut,
+        telephone: lastData.telephone,
+        titre: lastData.titre,
+        ville: lastData.ville
+      });
+      setOpenUpdate(true);
+    } catch (err) {
+      toast.error("Erreur de récupération des dernières données");
+    }
+  };
+
+  const saveNewUpdate = async () => {
+    const loadId = toast.loading(
+      selectedDate === 'new'
+        ? "Création d'une nouvelle version..."
+        : "Mise à jour de la version sélectionnée..."
+    );
+
+    try {
+      if (selectedDate === 'new') {
+        // CAS 1 : NOUVELLE VERSION
+        // On envoie les données au serveur pour créer une nouvelle ligne
+        await axiosPrivate.post('/api/membres-updates', formData);
+      } else {
+        // CAS 2 : MODIFIER UNE VERSION EXISTANTE
+        // On envoie un PUT vers une URL qui contient l'ID et la DATE précise
+        // Exemple : /api/membres-updates/12/2026-05-12
+
+        await axiosPrivate.put(`/api/membres-updates/${formData.id}`, formData);
+      }
+
+      toast.success("Enregistré avec succès !", { id: loadId });
+
+      // On ferme et on rafraîchit la liste
+      setOpenUpdate(false);
+      fetchMembres();
+
+    } catch (err) {
+      console.error("Erreur lors de la sauvegarde:", err);
+      toast.error(err.response?.data?.message || "Échec de l'enregistrement", { id: loadId });
+    }
+  };
+
+  const handleDeleteVersion = async () => {
+    const loadId = toast.loading("Suppression de la version...");
+    try {
+      // On utilise l'ID de la ligne d'update contenu dans formData
+      await axiosPrivate.delete(`/api/membres-updates/${formData.id}`);
+
+      toast.success("Version supprimée", { id: loadId });
+      //setOpenConfirmDelete(false);
+
+      // On recharge les dates et on repasse sur "new"
+      fetchDatesVersions(formData.membre_id);
+      handleVersionChange('new');
+    } catch (err) {
+      toast.error("Erreur lors de la suppression", { id: loadId });
+    }
+  };
+
+  // --- FILTRAGE TABLEAU ---
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) =>
+      row.nom?.toLowerCase().includes(searchText.toLowerCase()) ||
+      row.prenom?.toLowerCase().includes(searchText.toLowerCase()) ||
+      row.matricule?.toString().includes(searchText)
+    );
+  }, [rows, searchText]);
 
   // --- LOGIQUE IMPORT EXCEL ---
   const handleImportExcel = async () => {
@@ -106,7 +659,7 @@ const MembreMiseAJour = () => {
       });
       toast.success("Importation réussie !", { id: loadId });
       setOpenImport(false);
-      fetchUpdates(); // Rafraîchir la liste après import
+      //fetchUpdates(); // Rafraîchir la liste après import
     } catch (error) {
       console.error(error);
       const errorMsg = error.response?.data?.message || "Erreur lors de l'importation.";
@@ -117,164 +670,257 @@ const MembreMiseAJour = () => {
     }
   };
 
-  const handleEditClick = (id) => () => setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } });
-  const handleSaveClick = (id) => () => setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
-  const handleCancelClick = (id) => () => {
-    setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View, ignoreModifications: true } });
-    const editedRow = rows.find((r) => r.id === id);
-    if (editedRow?.isNew) setRows(rows.filter((r) => r.id !== id));
-  };
-
-  // --- Logique Suppression ---
-  const handleDeleteClick = (id) => () => {
-    setDeleteId(id);
-    setOpenConfirm(true);
-  };
-
-  const confirmDelete = async () => {
-    const loadId = toast.loading("Suppression...");
-    try {
-      await axiosPrivate.delete(`/api/membres-updates/${deleteId}`);
-      setRows(rows.filter((r) => r.id !== deleteId));
-      toast.success("Mise à jour supprimée", { id: loadId });
-    } catch (e) { 
-      console.error(e); 
-      toast.error("Erreur lors de la suppression", { id: loadId });
-    } finally {
-      setOpenConfirm(false);
-      setDeleteId(null);
-    }
-  };
-
-  const processRowUpdate = async (newRow) => {
-    const loadId = toast.loading("Enregistrement...");
-    try {
-      const dataToSend = { ...newRow };
-      delete dataToSend.isNew;
-      delete dataToSend.membre_nom_complet;
-      if (dataToSend.date_modification) {
-        const d = new Date(dataToSend.date_modification);
-        if (!isNaN(d.getTime())) dataToSend.date_modification = d.toISOString().split('T')[0];
-      }
-      const method = newRow.isNew ? 'post' : 'put';
-      const url = newRow.isNew ? '/api/membres-updates' : `/api/membres-updates/${newRow.id}`;
-      const response = await axiosPrivate[method](url, dataToSend);
-      
-      toast.success(newRow.isNew ? "Création réussie" : "Modification enregistrée", { id: loadId });
-      return { ...response.data, isNew: false };
-    } catch (err) {
-      toast.error("Erreur lors de la sauvegarde", { id: loadId });
-      throw err;
-    }
-  };
-
-  const columns = useMemo(() => [
-    // --- COLONNES FIXÉES À GAUCHE ---
-    { field: 'date_edition', headerName: "Édition", width: 100, pinned: 'left', valueFormatter: (p) => p.value ? new Date(p.value).toLocaleDateString('fr-FR') : '' },
-    { field: 'date_modification', headerName: "Modif.", width: 110, editable: true, type: 'date', pinned: 'left', valueGetter: (p) => p.value ? new Date(p.value) : null, valueFormatter: (p) => p.value ? new Date(p.value).toLocaleDateString('fr-FR') : '' },
-    { field: 'membre_id', headerName: 'Membre', width: 200, editable: true, type: 'singleSelect', valueOptions: listeMembres, pinned: 'left' },
-    
-    // --- COLONNES BADGES ---
-    { field: 'membre_active', headerName: 'Actif', width: 85, editable: true, type: 'singleSelect', valueOptions: ['Oui', 'Non'], renderCell: (p) => renderBadge(p, { 'Oui': '#2e7d32', 'Non': '#d32f2f' }) },
-    { field: 'situation', headerName: 'Situation', width: 120, editable: true, type: 'singleSelect', valueOptions: ['En activité', 'Inactive', 'Suspendu'], renderCell: (p) => renderBadge(p, { 'En activité': '#1976d2', 'Inactive': '#ed6c02', 'Suspendu': '#d32f2f' }) },
-    { field: 'section', headerName: 'Section', width: 150, editable: true, type: 'singleSelect', valueOptions: ['Expert Comptable', 'Société Expert'], renderCell: (p) => renderBadge(p, { 'Expert Comptable': '#9c27b0', 'Société Expert': '#00838f' }) },
-    { field: 'statut', headerName: 'Statut', width: 150, editable: true, type: 'singleSelect', valueOptions: ['Expert Comptable', 'Expert Stagiaire'], renderCell: (p) => renderBadge(p, { 'Expert Comptable': '#0288d1', 'Expert Stagiaire': '#455a64' }) },
-    { field: 'titre', headerName: 'Titre', width: 110, editable: true, type: 'singleSelect', valueOptions: ['Tableau A', 'Tableau B'], renderCell: (p) => renderBadge(p, { 'Tableau A': '#2e7d32', 'Tableau B': '#689f38' }) },
-
-    // --- COORDONNÉES ET INFOS ---
-    { field: 'email_oecfm', headerName: 'Email OECFM', width: 170, editable: true },
-    { field: 'adresse', headerName: 'Adresse', width: 180, editable: true },
-    { field: 'ville', headerName: 'Ville', width: 120, editable: true },
-    { field: 'code_postal', headerName: 'CP', width: 80, editable: true },
-    { field: 'boite_postale', headerName: 'BP', width: 80, editable: true },
-    { field: 'telephone', headerName: 'Téléphone', width: 130, editable: true },
-    { field: 'fax', headerName: 'Fax', width: 130, editable: true },
-    { field: 'email_personnel', headerName: 'Email Personnel', width: 170, editable: true },
-    { field: 'email_professionnel', headerName: 'Email Pro', width: 170, editable: true },
-    { field: 'poste', headerName: 'Poste', width: 180, editable: true, type: 'singleSelect', valueOptions: ['Caissier','Conseiller', 'Membre', 'Président','Président d honneur', 'Vice-Président Administratif', 'Vice-Président Technique','Secrétaire Exécutif','Secrétaire Général','Secrétaire Général Adjoint','Trésorier'] },
-    { field: 'region', headerName: 'Région', width: 130, editable: true },
-    { field: 'num_compte', headerName: 'N° Compte', width: 130, editable: true },
-    { field: 'nombre_associe', headerName: 'Assoc.', width: 90, editable: true, type: 'number' },
-
-    // --- ACTIONS FIXÉES À DROITE ---
+  const columns = [
     {
-      field: 'actions', type: 'actions', headerName: 'Actions', width: 80, pinned: 'right',
-      getActions: ({ id }) => {
-        const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
-        return isInEditMode ? [
-          <GridActionsCellItem key="s" icon={<SaveOutlined fontSize="small" color="primary" />} label="Save" onClick={handleSaveClick(id)} />,
-          <GridActionsCellItem key="c" icon={<CloseOutlined fontSize="small" color="error" />} label="Cancel" onClick={handleCancelClick(id)} />,
-        ] : [
-          <GridActionsCellItem key="e" icon={<EditOutlined fontSize="small" />} label="Edit" onClick={handleEditClick(id)} />,
-          <GridActionsCellItem key="d" icon={<DeleteOutlined fontSize="small" color="error" />} label="Delete" onClick={handleDeleteClick(id)} />,
-        ];
-      },
+      field: 'member',
+      headerName: 'MEMBRE',
+      flex: 1,
+      renderCell: (params) => (
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ height: '100%' }}>
+          <Avatar sx={{ bgcolor: '#e8f6ea', color: '#237524', fontWeight: 800, fontSize: '0.75rem' }}>
+            {params.row.nom?.charAt(0)}{params.row.prenom?.charAt(0)}
+          </Avatar>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
+              {params.row.nom} {params.row.prenom}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b' }}>
+              Matricule: {params.row.matricule || '---'}
+            </Typography>
+          </Box>
+        </Stack>
+      )
     },
-  ], [listeMembres, rowModesModel]);
+    {
+      field: 'actions',
+      headerName: 'SUIVI ET ACTIONS',
+      width: 200,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: (params) => (
+        <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center" sx={{ height: '100%' }}>
+          <IconButton size="small" onClick={() => handleViewHistory(params.row)} sx={{ color: '#237524' }}>
+            <HistoryOutlined fontSize="small" />
+          </IconButton>
+          <Button
+            size="small"
+            variant="contained"
+            disableElevation
+            onClick={() => handleOpenUpdate(params.row)}
+            sx={{
+              bgcolor: '#e3f8e4',
+              color: '#237524',
+              textTransform: 'none',
+              fontWeight: 700,
+              fontSize: '0.7rem',
+              borderRadius: '8px',
+              '&:hover': { bgcolor: '#e2e8f0' }
+            }}
+          >
+            Mise à jour
+          </Button>
+        </Stack>
+      )
+    }
+  ];
 
   return (
-    <Box sx={{ p: 0, bgcolor: '#f4f7f9', minHeight: '100vh' }}>
-      <Toaster position="top-right" />
+    <Box sx={{ p: 1, bgcolor: '#f8fafc', minHeight: '100vh' }}>
       <MyBreadcrumbs currentPath="Mise à jour infos membres" />
-      
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+
+      <Stack direction="column" justifyContent="space-between" alignItems="start" sx={{ mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 800, color: 'primary.main' }}>
           Mise à jour des membres
         </Typography>
-        <Stack direction="row" spacing={1}>
-          <Button size="small" variant="outlined" startIcon={<FileUploadOutlined />} onClick={() => setOpenImport(true)} sx={{ borderRadius: '8px', textTransform: 'none', px: 2 }}>
-            Importer Excel
-          </Button>
-          <Button size="small" variant="contained" startIcon={<AddOutlined />} onClick={handleAddNew} sx={{ borderRadius: '8px', bgcolor: '#1a237e', textTransform: 'none', px: 2 }}>
-            Nouvelle mise à jour
-          </Button>
-        </Stack>
+
+        <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+          Consultation de l'effectif et traçabilité des modifications administratives.
+        </Typography>
       </Stack>
 
-      <Paper elevation={0} sx={{ height: 700, borderRadius: '12px', border: '1px solid #e0e0e0', overflow: 'hidden' }}>
+      {/* HEADER SECTION */}
+      <Stack direction="row" justifyContent="space-between" alignItems="end" sx={{ mb: 2, width: '100%' }}>
+        <Box sx={{ flex: 1 }}></Box>
+        <Button
+          variant="contained"
+          startIcon={<FileUploadOutlined />}
+          onClick={() => setOpenImport(true)}
+          sx={{ bgcolor: '#18681c', borderRadius: '10px', textTransform: 'none', fontWeight: 600, px: 3 }}
+        >
+          Import Excel
+        </Button>
+      </Stack>
+
+      {/* SEARCH BAR */}
+      <TextField
+        fullWidth
+        placeholder="Rechercher par nom ou matricule..."
+        value={searchText}
+        onChange={(e) => setSearchText(e.target.value)}
+        sx={{
+          mb: 3,
+          '& .MuiOutlinedInput-root': {
+            bgcolor: '#fff',
+            borderRadius: '12px',
+            '& fieldset': { borderColor: '#e2e8f0' },
+            '&:hover fieldset': { borderColor: '#cbd5e1' }
+          }
+        }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchOutlined sx={{ color: '#94a3b8' }} />
+            </InputAdornment>
+          ),
+        }}
+      />
+
+      {/* MAIN TABLE */}
+      <Paper elevation={0} sx={{ borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)' }}>
         <DataGrid
-          rows={rows}
+          rows={filteredRows}
           columns={columns}
-          editMode="row"
           loading={loading}
-          rowModesModel={rowModesModel}
-          onRowModesModelChange={setRowModesModel}
-          processRowUpdate={processRowUpdate}
-          rowHeight={38}
-          columnHeaderHeight={42}
+          autoHeight
+          rowHeight={65}
           disableRowSelectionOnClick
-          initialState={{ pinnedColumns: { left: ['date_edition', 'date_modification', 'membre_id'], right: ['actions'] } }}
-          sx={{ 
+          sx={{
             border: 'none',
-            fontSize: '0.82rem',
-            '& .MuiDataGrid-columnHeaders': { bgcolor: '#f8fafb', borderBottom: '1px solid #e0e0e0' },
-            '& .MuiDataGrid-cell': { borderBottom: '1px solid #f5f5f5' },
-            '& .MuiInputBase-root': { fontSize: '0.8rem', height: '28px' },
-            '& .MuiSelect-select': { py: '4px !important' },
-            '& .MuiDataGrid-pinnedColumns': { bgcolor: '#fff', zIndex: 1 },
+            '& .MuiDataGrid-columnHeaders': {
+              bgcolor: '#f8fafc',
+              color: '#64748b',
+              fontSize: '0.65rem',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              borderBottom: '1px solid #e2e8f0'
+            },
+            '& .MuiDataGrid-cell': { borderBottom: '1px solid #f1f5f9' },
+            '& .MuiDataGrid-row:hover': { bgcolor: '#f8fafc', cursor: 'pointer' }
           }}
         />
       </Paper>
 
-      {/* DIALOGUE D'IMPORT EXCEL */}
-      {/* <Dialog open={openImport} onClose={() => setOpenImport(false)} PaperProps={{ sx: { borderRadius: '12px', width: '400px' } }}>
-        <DialogTitle sx={{ fontWeight: 800 }}>Importer des mises à jour</DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>
-            Sélectionnez votre fichier Excel (.xlsx) contenant les données de mise à jour.
-          </DialogContentText>
-          <Button variant="outlined" component="label" fullWidth sx={{ py: 2, borderStyle: 'dashed' }}>
-            {importFile ? importFile.name : "Choisir un fichier"}
-            <input type="file" hidden accept=".xlsx, .xls" ref={excelInputRef} onChange={(e) => setImportFile(e.target.files[0])} />
-          </Button>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenImport(false)} color="inherit">Annuler</Button>
-          <Button onClick={handleImportExcel} variant="contained" disabled={!importFile} sx={{ borderRadius: '8px', bgcolor: '#1a237e' }}>
-            Lancer l'importation
-          </Button>
-        </DialogActions>
-      </Dialog> */}
+      {/* --- DRAWER : HISTORIQUE (AUDIT) --- */}
+      <Drawer
+        anchor="right"
+        open={openHistory}
+        onClose={() => setOpenHistory(false)}
+        PaperProps={{ sx: { width: 600, bgcolor: '#f8fafc', boxShadow: '-10px 0 20px rgba(0,0,0,0.05)' } }}
+      >
+        {/* Header Sticky */}
+        <Box sx={{ p: 3, bgcolor: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 900, color: '#0f172a', letterSpacing: '-0.5px' }}>
+                Journal des modifications
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#22c55e' }} />
+                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                  {selectedMembre?.nom} {selectedMembre?.prenom}
+                </Typography>
+              </Stack>
+            </Box>
+            <IconButton onClick={() => setOpenHistory(false)} sx={{ bgcolor: '#f1f5f9', '&:hover': { bgcolor: '#e2e8f0' } }}>
+              <CloseOutlined fontSize="small" />
+            </IconButton>
+          </Stack>
+        </Box>
+
+        {/* Contenu de l'historique */}
+        <Box sx={{ p: 3 }}>
+          {historique.map((h, i) => {
+            // Pour Sequelize, on accède souvent à dataValues si c'est du brut, 
+            // sinon on prend l'objet directement.
+            const current = h.dataValues || h;
+            const prev = historique[i + 1]?.dataValues || historique[i + 1] || null;
+            const changedFields = getDiffFields(current, prev);
+
+            // Liste exhaustive des champs à afficher (ton schéma)
+            const allFields = [
+              'membre_active','situation', 'statut', 'titre', 'section','diplome','nombre_associe','poste', 'email_oecfm','email_personnel',
+              'email_professionnel', 'adresse',
+              'ville','code_postal', 'boite_postale', 'telephone', 'fax',
+              'region', 'num_compte' 
+            ];
+
+            return (
+              <Box key={current.id} sx={{ position: 'relative', mb: 4, pl: 3, borderLeft: '2px solid #e2e8f0' }}>
+                {/* Point de la Timeline */}
+                <Box sx={{
+                  position: 'absolute', left: -9, top: 0, width: 16, height: 16,
+                  bgcolor: i === 0 ? '#22c55e' : '#cbd5e1',
+                  borderRadius: '50%', border: '4px solid #f8fafc'
+                }} />
+
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1e293b', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {i === 0 ? "Version Actuelle" : `Révision du ${new Date(current.date_modification).toLocaleDateString('fr-FR')}`}
+                  {i === 0 && <Chip label="Live" size="small" sx={{ height: 18, bgcolor: '#dcfce7', color: '#166534', fontWeight: 700, fontSize: '0.65rem' }} />}
+                </Typography>
+
+                <Card elevation={0} sx={{ borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                  <TableContainer>
+                    <Table size="small">
+                      <TableBody>
+                        {allFields.map((field) => {
+                          const isChanged = changedFields.includes(field);
+                          const value = current[field];
+                          const oldValue = prev ? prev[field] : null;
+
+                          return (
+                            <TableRow key={field} sx={{
+                              bgcolor: isChanged ? '#f0fdf4' : 'transparent',
+                              '&:last-child td': { border: 0 }
+                            }}>
+                              <TableCell sx={{ width: '35%', py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
+                                <Typography variant="caption" sx={{ fontWeight: 700, color: isChanged ? '#166534' : '#94a3b8', textTransform: 'uppercase', fontSize: '0.65rem' }}>
+                                  {field.replace('_', ' ')}
+                                </Typography>
+                              </TableCell>
+                              <TableCell sx={{ py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  {isChanged && prev && (
+                                    <>
+                                      <Typography variant="caption" sx={{ color: '#94a3b8', textDecoration: 'line-through' }}>
+                                        {oldValue || 'vide'}
+                                      </Typography>
+                                      <ArrowForwardIosOutlined sx={{ fontSize: 12, color: '#22c55e' }} />
+                                    </>
+                                  )}
+                                  <Typography variant="body2" sx={{
+                                    fontWeight: isChanged ? 700 : 500,
+                                    color: isChanged ? '#166534' : '#475569'
+                                  }}>
+                                    {value || <em style={{ color: '#cbd5e1' }}>vide</em>}
+                                  </Typography>
+                                </Stack>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Card>
+              </Box>
+            );
+          })}
+        </Box>
+      </Drawer>
+
+      {/* --- DRAWER : MISE À JOUR (FORMULAIRE) --- */}
+      <EditMembreDrawer
+        open={openUpdate}
+        onClose={() => setOpenUpdate(false)}
+        formData={formData}
+        setFormData={setFormData}
+        onFinalSubmit={saveNewUpdate}
+        datesHistorique={datesHistorique}
+        selectedDate={selectedDate}
+        handleVersionChange={handleVersionChange}
+        onDeleteVersion={handleDeleteVersion}
+      />
 
       {/* POPUP IMPORT FICHIER EXCEL */}
       <Dialog open={openImport} onClose={() => setOpenImport(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
@@ -283,28 +929,28 @@ const MembreMiseAJour = () => {
           <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
             Veuillez utiliser le modèle standard pour assurer la compatibilité des données.
           </Typography>
-          
-          <Button 
-            fullWidth 
+
+          <Button
+            fullWidth
             variant="soft" // Ou "outlined" selon votre thème
             startIcon={<FileDownloadOutlined />}
             href={`${URL}/public/templates/modeleImportMembreUpdate.xlsx`} // Lien vers le fichier sur votre serveur
-            download="Modele_Import_Membres_update_infos.xlsx"
+            download="modeleImportMembreUpdate.xlsx"
             sx={{ mb: 3, bgcolor: '#f0f7ff', color: '#0072ea', py: 1.5 }}
           >
             Télécharger le modèle (.xlsx)
           </Button>
 
-          <Box 
+          <Box
             onClick={() => excelInputRef.current.click()}
-            sx={{ 
-              border: '2px dashed #e0e0e0', borderRadius: 3, p: 3, textAlign: 'center', 
+            sx={{
+              border: '2px dashed #e0e0e0', borderRadius: 3, p: 3, textAlign: 'center',
               cursor: 'pointer', '&:hover': { bgcolor: '#fafafa', borderColor: 'primary.main' }
             }}
           >
-            <input 
-              type="file" hidden ref={excelInputRef} accept=".xlsx, .xls" 
-              onChange={(e) => setImportFile(e.target.files[0])} 
+            <input
+              type="file" hidden ref={excelInputRef} accept=".xlsx, .xls"
+              onChange={(e) => setImportFile(e.target.files[0])}
             />
             <FileUploadOutlined sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
@@ -314,9 +960,9 @@ const MembreMiseAJour = () => {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpenImport(false)} color="inherit">Annuler</Button>
-          <Button 
-            variant="contained" 
-            disabled={!importFile} 
+          <Button
+            variant="contained"
+            disabled={!importFile}
             onClick={handleImportExcel}
             sx={{ borderRadius: 2, px: 4 }}
           >
@@ -325,23 +971,8 @@ const MembreMiseAJour = () => {
         </DialogActions>
       </Dialog>
 
-      {/* DIALOGUE DE CONFIRMATION DE SUPPRESSION */}
-      <Dialog open={openConfirm} onClose={() => setOpenConfirm(false)} PaperProps={{ sx: { borderRadius: '12px' } }}>
-        <DialogTitle sx={{ fontWeight: 800 }}>Confirmer la suppression</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Voulez-vous vraiment supprimer cet enregistrement de mise à jour ?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenConfirm(false)} color="inherit" sx={{ textTransform: 'none' }}>Annuler</Button>
-          <Button onClick={confirmDelete} variant="contained" color="error" sx={{ borderRadius: '8px', textTransform: 'none' }}>
-            Supprimer
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };
 
-export default MembreMiseAJour;
+export default MembreMiseAJourPro;

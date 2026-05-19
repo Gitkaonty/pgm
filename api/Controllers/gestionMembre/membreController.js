@@ -28,7 +28,7 @@ exports.getAllMembres = async (req, res) => {
 
         const membres = await Membre.findAll({ 
             where : {...(!admin && { id: ConnectedMember_Id || 0 })},
-            order: [['id', 'DESC']] 
+            order: [['nom', 'ASC']] 
         });
         res.status(200).json(membres);
     } catch (error) {
@@ -139,12 +139,12 @@ exports.createMembre = async (req, res) => {
             prenom: req.body.prenom,
             sexe: req.body.sexe,
             cin: req.body.cin,
-            date_naissance: req.body.date_naissance,
+            date_naissance: req.body.date_naissance? req.body.date_naissance: null,
             // Nouveaux champs
             lieu_naissance: req.body.lieu_naissance,
-            date_cin: req.body.date_cin,
+            date_cin: req.body.date_cin? req.body.date_cin: null,
             lieu_cin: req.body.lieu_cin,
-            date_adhesion: req.body.date_adhesion,
+            date_adhesion: req.body.date_adhesion? req.body.date_adhesion: null,
             promotion: req.body.promotion,
             // Photo
             photo_url: req.file ? req.file.filename : null 
@@ -213,7 +213,7 @@ exports.importExcel = async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ message: "Fichier manquant" });
 
-        const workbook = xlsx.readFile(filePath);
+        const workbook = xlsx.readFile(filePath, { cellDates: true });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         
         // On récupère les dates proprement en objets JS
@@ -238,10 +238,10 @@ exports.importExcel = async (req, res) => {
                 sexe: row.sexe,
                 cin: row.cin,
                 promotion: row.promotion,
-                date_adhesion: row.date_adhesion || row.adhesion,
-                date_naissance: row.date_naissance,
+                date_adhesion: row.date_adhesion? row.date_adhesion: null,
+                date_naissance: row.date_naissance? row.date_naissance: null,
                 lieu_naissance: row.lieu_naissance,
-                date_cin: row.date_cin,
+                date_cin: row.date_cin? row.date_cin: null,
                 lieu_cin: row.lieu_cin
                 // Ne mettez PAS de createdAt/updatedAt ici si vous avez mis timestamps: false
             };

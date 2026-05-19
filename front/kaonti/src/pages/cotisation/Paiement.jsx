@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box, Typography, Button, Stack, FormControl, Select, MenuItem,
-  Dialog, DialogTitle, DialogContent, DialogActions, Grid,
-  TextField, Autocomplete, InputAdornment, IconButton, Divider,
-  InputLabel,
-  CircularProgress,
-  Breadcrumbs,
-  Link,
-  Badge,
-  Tooltip
+    Box, Typography, Button, Stack, FormControl, Select, MenuItem,
+    Dialog, DialogTitle, DialogContent, DialogActions, Grid,
+    TextField, Autocomplete, InputAdornment, IconButton, Divider,
+    InputLabel,
+    CircularProgress,
+    Breadcrumbs,
+    Link,
+    Badge,
+    Tooltip
 } from '@mui/material';
-import { DataGrid, frFR } from '@mui/x-data-grid';
+import { DataGrid, frFR, GridToolbar, useGridApiContext, GridFooterContainer, GridFooter } from '@mui/x-data-grid';
 import AddCardIcon from '@mui/icons-material/AddCard';
 import CloseIcon from '@mui/icons-material/Close';
 import SaveIcon from '@mui/icons-material/Save';
@@ -36,153 +36,18 @@ import ForwardToInboxIcon from '@mui/icons-material/ForwardToInbox';
 import { URL } from '../../../config/axios';
 import { jwtDecode } from 'jwt-decode';
 import useAuth from '../../hooks/useAuth';
+import { pdf } from '@react-pdf/renderer';
+import PaiementTableauPDF from './PaiementTableauPDF';
+import TicketCaissePDF from './TicketCaissePDF';
 
 const MyBreadcrumbs = ({ currentPath }) => (
-  <Breadcrumbs separator={<NavigateNext fontSize="small" />} sx={{ mb: 2 }}>
-    <Link underline="hover" color="inherit" href="/dashboard" sx={{ display: 'flex', alignItems: 'center' }}>
-      <HomeOutlined sx={{ mr: 0.5, fontSize: 20 }} /> Dashboard
-    </Link>
-    <Typography color="text.primary" sx={{ fontWeight: 600 }}>{currentPath}</Typography>
-  </Breadcrumbs>
+    <Breadcrumbs separator={<NavigateNext fontSize="small" />} sx={{ mb: 2 }}>
+        <Link underline="hover" color="inherit" href="/dashboard" sx={{ display: 'flex', alignItems: 'center' }}>
+            <HomeOutlined sx={{ mr: 0.5, fontSize: 20 }} /> Dashboard
+        </Link>
+        <Typography color="text.primary" sx={{ fontWeight: 600 }}>{currentPath}</Typography>
+    </Breadcrumbs>
 );
-
-const styles = StyleSheet.create({
-  page: { padding: 40, fontSize: 9, fontFamily: 'Helvetica', color: '#334155' },
-  // EN-TETE
-  headerContainer: { flexDirection: 'row', justifyContent: 'spaceBetween', marginBottom: 30, borderBottomWidth: 2, borderBottomColor: '#1b4332', pb: 10 },
-  logoSection: { flexDirection: 'row', alignItems: 'center' },
-  logoPlaceholder: { width: 50, height: 50, backgroundColor: '#f1f5f9', marginRight: 10 }, // À remplacer par src={logoOECFM}
-  logoImage: {
-    width: 50,
-    height: 50,
-    marginRight: 10,
-    // On peut ajouter objectFit pour éviter les déformations
-    objectFit: 'contain' 
-  },
-  headerText: { flexDirection: 'column' },
-  oecfmTitle: { fontSize: 18, fontWeight: 'bold', color: '#1b4332', letterSpacing: 1 },
-  oecfmSubtitle: { fontSize: 9, color: '#64748b', marginTop: 2 },
-  
-  // INFOS DOCUMENT
-  docInfo: { marginBottom: 20, marginLeft: 150, textAlign: 'right' },
-  title: { fontSize: 14, fontWeight: 'bold', textTransform: 'uppercase', color: '#1e293b' },
-  exercice: { fontSize: 10, color: '#475569', marginTop: 4 },
-
-  // TABLEAU
-  table: { display: "table", width: "100%", borderStyle: "solid", marginTop: 10 },
-  tableRow: { flexDirection: "row", borderBottomColor: '#e2e8f0', borderBottomWidth: 0.5, minHeight: 22, alignItems: 'center' },
-  tableColHeader: { backgroundColor: '#1b4332', color: '#ffffff', fontWeight: 'bold', borderBottomWidth: 0 },
-  tableCell: { padding: 4, fontSize: 7 },
-  
-  // Alignements et Largeurs
-  col1: { width: '8%' }, // Matr
-  col2: { width: '32%' }, // Nom/Prenom
-  col3: { width: '15%' },
-  col4: { width: '15%', textAlign: 'right' }, // Montant
-  col5: { width: '15%', textAlign: 'right' }, // Ajust
-  col6: { width: '15%', textAlign: 'right', fontWeight: 'bold' }, // Net
-
-  colEdition: { width: '5%' },
-  colDate: { width: '5%' },
-  colMatricule: { width: '6%' },
-  colNom: { width: '20%' },
-  colDetail: { width: '20%' },
-  colAnouveau: { width: '10%', textAlign: 'right' },
-  colCotisation: { width: '10%' , textAlign: 'right'},
-  colAutre: { width: '10%' , textAlign: 'right'},
-  colTotal: { width: '10%' , textAlign: 'right'},
-  colValide: { width: '4%', textAlign: 'center' },
-  
-  // Footer spécifique : on cumule les largeurs des 7 premières colonnes (6+22+10+10+8+8+8 = 72%)
-  footerLabel: { width: '46%', fontWeight: 'bold', textAlign: 'left', color: '#1b4332', paddingRight: 10 },
-  colInterm: { width: '10%', textAlign: 'center' },
-});
-
-const MyPdfDocument = ({ data, exerciceLabel }) => {
-  // Calcul des totaux
-  const totalAnouveau = data.reduce((sum, r) => sum + (Number(r.anouveau) || 0), 0);
-  const totalCotisation = data.reduce((sum, r) => sum + (Number(r.cotisation) || 0), 0);
-  const totalAutre = data.reduce((sum, r) => sum + (Number(r.autre) || 0), 0);
-  const total = data.reduce((sum, r) => sum + (Number(r.total) || 0), 0);
-
-  const fNum = (val) => {
-    return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0 })
-      .format(val || 0)
-      .replace(/\s/g, ' ')
-      .replace(/,/g, ' ');
-  };
-
-  return (
-    <Document>
-      <Page size="A4" orientation="landscape" style={styles.page}>
-        {/* Header Institutionnel */}
-        <View style={styles.headerContainer}>
-          <View style={styles.logoSection}>
-            <Image 
-                style={styles.logoImage} 
-                src="/logo500.png" // Assure-toi que le nom du fichier est exact
-            />
-            <View style={styles.headerText}>
-              <Text style={styles.oecfmTitle}>OECFM</Text>
-              <Text style={styles.oecfmSubtitle}>Ordre des Experts Comptables et Financiers de Madagascar</Text>
-            </View>
-          </View>
-          <View style={styles.docInfo}>
-            <Text style={styles.title}>{"Tableau des paiments de cotisations"}</Text>
-            <Text style={styles.exercice}>Période : {exerciceLabel}</Text>
-            <Text style={styles.exercice}>Date d'édition : {new Date().toLocaleDateString('fr-FR')}</Text>
-          </View>
-        </View>
-        
-        {/* Table */}
-        <View style={styles.table}>
-          {/* Header du tableau - Nouvel Ordre */}
-          <View style={[styles.tableRow, styles.tableColHeader]}>
-            <Text style={[styles.tableCell, styles.colEdition]}>EDITION</Text>
-            <Text style={[styles.tableCell, styles.colDate]}>DATE PAIEMENT</Text>
-            <Text style={[styles.tableCell, styles.colMatricule]}>Matr.</Text>
-            <Text style={[styles.tableCell, styles.colNom]}>NOM ET PRÉNOMS</Text>
-            <Text style={[styles.tableCell, styles.colDetail]}>DETAILS PAIEMENT / REFERENCE</Text>
-            <Text style={[styles.tableCell, styles.colAnouveau]}>PAI. ANOUVEAU</Text>
-            <Text style={[styles.tableCell, styles.colCotisation]}>PAI. COTIS ANNEE</Text>
-            <Text style={[styles.tableCell, styles.colAutre]}>PAI. AUTRE APPEL</Text>
-            <Text style={[styles.tableCell, styles.colTotal]}>TOTAL</Text>
-            <Text style={[styles.tableCell, styles.colValide]}>VALIDE</Text>
-          </View>
-
-          {/* Lignes de données */}
-          {data.map((row, i) => (
-            <View key={i} style={[styles.tableRow, { backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc' }]}>
-                <Text style={[styles.tableCell, styles.colEdition]}>{new Date(row.created_at).toLocaleDateString('fr-FR')}</Text>
-                <Text style={[styles.tableCell, styles.colDate]}>{new Date(row.date).toLocaleDateString('fr-FR')}</Text>
-              <Text style={[styles.tableCell, styles.colMatricule]}>{row.matricule}</Text>
-              <Text style={[styles.tableCell, styles.colNom]}>{row.nom} {row.prenom}</Text>
-              <Text style={[styles.tableCell, styles.colDetail]}>{row.nom} {row.reference}</Text>
-              <Text style={[styles.tableCell, styles.colAnouveau]}>{fNum(row.anouveau)}</Text>
-              <Text style={[styles.tableCell, styles.colCotisation]}>{fNum(row.cotisation)}</Text>
-              <Text style={[styles.tableCell, styles.colAutre]}>{fNum(row.autre)}</Text>
-              <Text style={[styles.tableCell, styles.colTotal]}>{fNum(row.total)}</Text>
-              {/* Logique Régime : 0=Normal, 1=Réduit */}
-              <Text style={[styles.tableCell, styles.colValide]}>
-                {row.valide === true ? "oui" : "Non"}
-              </Text>
-            </View>
-          ))}
-
-          {/* FOOTER TOTALISATION */}
-          <View style={[styles.tableRow, { backgroundColor: '#dcfce7', borderBottomWidth: 0, marginTop: 2 }]}>
-            <Text style={[styles.tableCell, styles.footerLabel]}>TOTAL GÉNÉRAL :</Text>
-            <Text style={[styles.tableCell, styles.colInterm]}></Text>
-            <Text style={[styles.tableCell, styles.colAnouveau, { fontWeight: 'bold', color: '#1b4332' }]}>{fNum(totalAnouveau)}</Text>
-            <Text style={[styles.tableCell, styles.colCotisation, { fontWeight: 'bold', color: '#1b4332' }]}>{fNum(totalCotisation)}</Text>
-            <Text style={[styles.tableCell, styles.colAutre, { fontWeight: 'bold', color: '#1b4332' }]}>{fNum(totalAutre)}</Text>
-            <Text style={[styles.tableCell, styles.colTotal, { fontWeight: 'bold', color: '#1b4332' }]}>{fNum(total)}</Text>
-          </View>
-        </View>
-      </Page>
-    </Document>
-  );
-};
 
 const formatRef = (row) => {
     if (row.ref_prefix && row.ref_seq) {
@@ -211,15 +76,17 @@ const PaiementPage = () => {
     const [singleModalOpen, setSingleModalOpen] = useState(false);
     const [selectedRow, setSelectedRow] = useState(null);
     const [isSending, setIsSending] = useState(false);
-    const [orderInfo,setOrderInfo] = useState({});
+    const [orderInfo, setOrderInfo] = useState({});
     const [showComponent, setShowComponent] = useState(false);
 
-    const [confirmDialog, setConfirmDialog] = useState({ 
-        open: false, 
-        title: '', 
-        message: '', 
+    const [loading, setLoading] = useState(false);
+
+    const [confirmDialog, setConfirmDialog] = useState({
+        open: false,
+        title: '',
+        message: '',
         onConfirm: null,
-        color: 'primary' 
+        color: 'primary'
     });
 
     const { auth } = useAuth();
@@ -231,105 +98,105 @@ const PaiementPage = () => {
     const roles = decoded.UserInfo.roles;
     const userId = decoded.UserInfo.userId || null;
 
-    useEffect(() =>{
-        if([3355, 5150].includes(roles)){
+    useEffect(() => {
+        if ([3355, 5150].includes(roles)) {
             setShowComponent(true);
         }
-    },[roles]);
+    }, [roles]);
 
     //ENVOI MAIL================================================================================================
-        const handleOpenEmail = (member = null) => {
-            setCurrentMember(member); // Si null, ce sera "Tous les membres" par défaut
-            setEmailModalOpen(true);
-        };
+    const handleOpenEmail = (member = null) => {
+        setCurrentMember(member); // Si null, ce sera "Tous les membres" par défaut
+        setEmailModalOpen(true);
+    };
 
-        const handleSendBulk = async () => {
-            // Appel à la nouvelle route bulk
-            await handleSendMail('all'); 
-        };
+    const handleSendBulk = async () => {
+        // Appel à la nouvelle route bulk
+        await handleSendMail('all');
+    };
 
-        const handleConfirmSingle = async () => {
-            setIsSending(true); // 1. On active le chargement
-            try {
-                const ex = exercices.find(e => e.id === selectedEx);
-                if (!ex) return "";
+    const handleConfirmSingle = async () => {
+        setIsSending(true); // 1. On active le chargement
+        try {
+            const ex = exercices.find(e => e.id === selectedEx);
+            if (!ex) return "";
 
-                const date_start = new Date(ex.date_debut).toLocaleDateString('fr-FR');
-                const date_fin = new Date(ex.date_fin).toLocaleDateString('fr-FR');
+            const date_start = new Date(ex.date_debut).toLocaleDateString('fr-FR');
+            const date_fin = new Date(ex.date_fin).toLocaleDateString('fr-FR');
 
-                // On utilise l'ID stocké quand on a cliqué sur l'icône
-                await axiosPrivate.post(`/api/paiements/${selectedRow.id}/send-email`, {
-                    dateFin: ex.date_fin
-                });
-                
-                toast.success("Email envoyé avec succès !");
-                setSingleModalOpen(false); // On ferme le popup
-                await loadPaiements(selectedEx);          // On rafraîchit le tableau
-            } catch (err) {
-                toast.error("Erreur lors de l'envoi");
-            } finally{
-                setIsSending(false); // 2. On désactive le chargement (qu'il y ait succès ou erreur)
-            }
-        };
+            // On utilise l'ID stocké quand on a cliqué sur l'icône
+            await axiosPrivate.post(`/api/paiements/${selectedRow.id}/send-email`, {
+                dateFin: ex.date_fin
+            });
 
-        const handleSendMail = async (target) => {
-            try {
-                    const ex = exercices.find(e => e.id === selectedEx);
-                    if (!ex) return "";
+            toast.success("Email envoyé avec succès !");
+            setSingleModalOpen(false); // On ferme le popup
+            await loadPaiements(selectedEx);          // On rafraîchit le tableau
+        } catch (err) {
+            toast.error("Erreur lors de l'envoi");
+        } finally {
+            setIsSending(false); // 2. On désactive le chargement (qu'il y ait succès ou erreur)
+        }
+    };
 
-                    const date_start = new Date(ex.date_debut).toLocaleDateString('fr-FR');
-                    const date_fin = new Date(ex.date_fin).toLocaleDateString('fr-FR');
+    const handleSendMail = async (target) => {
+        try {
+            const ex = exercices.find(e => e.id === selectedEx);
+            if (!ex) return "";
 
-                // Définition de l'URL selon la cible
-                const url = target === 'all' 
-                    ? '/api/paiements/send-email-bulk' 
-                    : `/api/paiements/${target}/send-email`;
+            const date_start = new Date(ex.date_debut).toLocaleDateString('fr-FR');
+            const date_fin = new Date(ex.date_fin).toLocaleDateString('fr-FR');
 
-                await axiosPrivate.post(url, {
-                    dateFin: ex.date_fin,
-                    paiementIds: target === 'all'  ? rows.map(row => row.id) : null
-                });
+            // Définition de l'URL selon la cible
+            const url = target === 'all'
+                ? '/api/paiements/send-email-bulk'
+                : `/api/paiements/${target}/send-email`;
 
-                toast.success(target === 'all' ? "Envois groupés terminés !" : "Email envoyé !");
-                
-                // On rafraîchit les données pour mettre à jour les badges (email_logs)
-                await loadPaiements(selectedEx);
+            await axiosPrivate.post(url, {
+                dateFin: ex.date_fin,
+                paiementIds: target === 'all' ? rows.map(row => row.id) : null
+            });
 
-            } catch (err) {
-                console.error(err);
-                toast.error("Erreur lors de l'envoi");
-            }
-        };
+            toast.success(target === 'all' ? "Envois groupés terminés !" : "Email envoyé !");
 
-        //affichage mail historique
-        const handleShowEmailHistory = async (row) => {
-            try {
-                // Optionnel : afficher un loader si tu veux être très propre
-                //const response = await axiosPrivate.get(`/api/dashboard/stats/${selectedEx}`);
-                const response = await axiosPrivate.get(`/api/paiements/${row.id}/email-logs`);
+            // On rafraîchit les données pour mettre à jour les badges (email_logs)
+            await loadPaiements(selectedEx);
 
-                // On stocke les logs récupérés
-                setSelectedHistory(response.data);
-                setHistoryTarget(`${row.nom} ${row.prenom}`);
-                setHistoryModalOpen(true);
-            } catch (error) {
-                console.error("Erreur lors de la récupération de l'historique :", error);
-                toast.error("Impossible de charger l'historique des emails.");
-            }
-        };
+        } catch (err) {
+            console.error(err);
+            toast.error("Erreur lors de l'envoi");
+        }
+    };
+
+    //affichage mail historique
+    const handleShowEmailHistory = async (row) => {
+        try {
+            // Optionnel : afficher un loader si tu veux être très propre
+            //const response = await axiosPrivate.get(`/api/dashboard/stats/${selectedEx}`);
+            const response = await axiosPrivate.get(`/api/paiements/${row.id}/email-logs`);
+
+            // On stocke les logs récupérés
+            setSelectedHistory(response.data);
+            setHistoryTarget(`${row.nom} ${row.prenom}`);
+            setHistoryModalOpen(true);
+        } catch (error) {
+            console.error("Erreur lors de la récupération de l'historique :", error);
+            toast.error("Impossible de charger l'historique des emails.");
+        }
+    };
 
     // --- FORM STATE MODAL ---
     const initialForm = {
         date: new Date().toISOString().split('T')[0],
         membreId: null,
         exerciceId: '',
-        sitAnouveau: 0, 
-        sitCotisation: 0, 
+        sitAnouveau: 0,
+        sitCotisation: 0,
         sitAutre: 0,
-        payeAnouveau: 0, 
-        payeCotisation: 0, 
+        payeAnouveau: 0,
+        payeCotisation: 0,
         payeAutre: 0,
-        mode: 'Espèce', 
+        mode: 'Espèce',
         reference: ''
     };
     const [form, setForm] = useState(initialForm);
@@ -358,31 +225,31 @@ const PaiementPage = () => {
 
     useEffect(() => {
         const fetchDataInit = async () => {
-          try {
-            const [resEx, resMem] = await Promise.all([
-              axiosPrivate.get('/api/exercices'),
-              axiosPrivate.get('/api/membres')
-            ]);
-            setExercices(resEx.data);
-            //setMembres(resMem.data);
-            if (resEx.data.length > 0) setSelectedEx(resEx.data[0].id);
-            const response = await axiosPrivate.get(`/api/membres/${resEx.data[0].date_fin}/active`);
-            setMembres(response.data);
-          } catch (err) { toast.error("Erreur chargement données"); }
+            try {
+                const [resEx, resMem] = await Promise.all([
+                    axiosPrivate.get('/api/exercices'),
+                    axiosPrivate.get('/api/membres')
+                ]);
+                setExercices(resEx.data);
+                //setMembres(resMem.data);
+                if (resEx.data.length > 0) setSelectedEx(resEx.data[0].id);
+                const response = await axiosPrivate.get(`/api/membres/${resEx.data[0].date_fin}/active`);
+                setMembres(response.data);
+            } catch (err) { toast.error("Erreur chargement données"); }
         };
         fetchDataInit();
         fetchSettings();
     }, [axiosPrivate]);
 
     useEffect(() => {
-    const fetchDataInit = async () => {
-      try {
-           const ex = exercices.find(e => e.id === selectedEx);
-          if (!ex) return "";
+        const fetchDataInit = async () => {
+            try {
+                const ex = exercices.find(e => e.id === selectedEx);
+                if (!ex) return "";
 
-            const response = await axiosPrivate.get(`/api/membres/${ex.date_fin}/active`);
-            setMembres(response.data);
-        } catch (err) { toast.error("Erreur chargement données"); }
+                const response = await axiosPrivate.get(`/api/membres/${ex.date_fin}/active`);
+                setMembres(response.data);
+            } catch (err) { toast.error("Erreur chargement données"); }
         };
         fetchDataInit();
         fetchSettings();
@@ -391,14 +258,14 @@ const PaiementPage = () => {
     useEffect(() => {
         const fetchSynthese = async () => {
             // Condition : exercice et membre doivent être sélectionnés
-            
+
             if (form.exerciceId && form.membreId) {
-                 const ex = exercices.find(e => e.id === form.exerciceId);
+                const ex = exercices.find(e => e.id === form.exerciceId);
                 if (!ex) return "";
 
                 const date_start = new Date(ex.date_debut).toLocaleDateString('fr-FR');
                 const date_fin = new Date(ex.date_fin).toLocaleDateString('fr-FR');
-                
+
                 try {
                     const response = await axiosPrivate.get('/api/paiements/synthese-reglement', {
                         params: {
@@ -417,9 +284,9 @@ const PaiementPage = () => {
                         sitAnouveau: anouveau,
                         sitCotisation: cotisAnnee,
                         sitAutre: autreAppel,
-                       
+
                     }));
-                    
+
                 } catch (error) {
                     toast.error("Erreur lors de la récupération du solde");
                 }
@@ -445,91 +312,92 @@ const PaiementPage = () => {
         { field: 'created_at', headerName: "Édition", width: 100, pinned: 'left', valueFormatter: (p) => p.value ? new Date(p.value).toLocaleDateString('fr-FR') : '' },
         { field: 'date', headerName: "date paiement", width: 120, editable: true, type: 'date', pinned: 'left', valueGetter: (p) => p.value ? new Date(p.value) : null, valueFormatter: (p) => p.value ? new Date(p.value).toLocaleDateString('fr-FR') : '' },
         { field: 'matricule', headerName: 'Matricule', width: 120 },
-        { 
-            field: 'fullName', 
-            headerName: 'Membre', 
+        {
+            field: 'fullName',
+            headerName: 'Membre',
             width: 350,
             // Correction : on extrait "row" de l'objet de paramètres
             valueGetter: (params) => {
-            const row = params.row;
-            if (!row) return '';
-            return `${row.nom || ''} ${row.prenom || ''}`.trim();
+                const row = params.row;
+                if (!row) return '';
+                return `${row.nom || ''} ${row.prenom || ''}`.trim();
             }
         },
-        { 
-            field: 'num_ticket', 
-            headerName: 'Référence paiement', 
+        {
+            field: 'num_ticket',
+            headerName: 'Référence paiement',
             width: 200,
         },
+        { field: 'mode', headerName: 'Mode de règlement', width: 175 },
         { field: 'reference', headerName: 'Détails paiement', width: 250 },
-        { 
-            field: 'anouveau', 
-            headerName: 'Pai. A-nouveau', 
-            type: 'number', 
+        {
+            field: 'anouveau',
+            headerName: 'Pai. A-nouveau',
+            type: 'number',
             width: 180,
             // On déstructure l'objet pour récupérer { value }
             valueFormatter: ({ value }) => value ? `${value.toLocaleString('fr-FR')} Ar` : '0 Ar'
         },
-        { 
-            field: 'cotis_annee', 
-            headerName: 'Pai. Cotis. Année', 
-            type: 'number', 
+        {
+            field: 'cotis_annee',
+            headerName: 'Pai. Cotis. Année',
+            type: 'number',
             width: 180,
             valueFormatter: ({ value }) => value ? `${value.toLocaleString('fr-FR')} Ar` : '0 Ar'
         },
-        { 
-            field: 'autre_appel', 
-            headerName: 'Pai. Autre Appel', 
-            type: 'number', 
+        {
+            field: 'autre_appel',
+            headerName: 'Pai. Autre Appel',
+            type: 'number',
             width: 180,
             valueFormatter: ({ value }) => value ? `${value.toLocaleString('fr-FR')} Ar` : '0 Ar'
         },
-        { 
-            field: 'total', 
-            headerName: 'Total Payé', 
-            type: 'number', 
+        {
+            field: 'total',
+            headerName: 'Total Payé',
+            type: 'number',
             width: 180,
             cellClassName: 'font-bold-green',
             valueFormatter: ({ value }) => value ? `${value.toLocaleString('fr-FR')} Ar` : '0 Ar'
         },
-        { 
-            field: 'valide', 
-            headerName: 'ÉTAT', 
+        {
+            field: 'valide',
+            headerName: 'ÉTAT',
             width: 120,
             renderCell: (params) => {
-            const isValid = params.value; // true ou false provenant du back (Sequelize)
+                const isValid = params.value; // true ou false provenant du back (Sequelize)
 
-            return (
-                <Stack direction="row" alignItems="center" spacing={1}>
-                {isValid ? (
-                    <Chip
-                    icon={<CheckCircleIcon style={{ color: '#1b4332' }} />}
-                    label="Validé"
-                    size="small"
-                    sx={{ 
-                        bgcolor: '#dcfce7', 
-                        color: '#1b4332', 
-                        fontWeight: 700,
-                        fontSize: '0.7rem',
-                        border: '1px solid #1b4332' 
-                    }}
-                    />
-                ) : (
-                    <Chip
-                    icon={<PendingActionsIcon style={{ color: '#991b1b' }} />}
-                    label="En attente"
-                    size="small"
-                    sx={{ 
-                        bgcolor: '#fee2e2', 
-                        color: '#991b1b', 
-                        fontWeight: 700,
-                        fontSize: '0.7rem',
-                        border: '1px solid #991b1b' 
-                    }}
-                    />
-                )}
-                </Stack>
-            );
+                return (
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                        {isValid ? (
+                            <Chip
+                                icon={<CheckCircleIcon style={{ color: '#1b4332' }} />}
+                                label="Validé"
+                                size="small"
+                                sx={{
+                                    bgcolor: '#dcfce7',
+                                    color: '#1b4332',
+                                    fontWeight: 700,
+                                    fontSize: '0.7rem',
+                                    border: '1px solid #1b4332'
+                                }}
+                            />
+                        ) : (
+                            <Chip
+                                icon={<PendingActionsIcon style={{ color: '#991b1b' }} />}
+                                label="En attente"
+                                size="small"
+                                sx={{
+                                    bgcolor: '#fee2e2',
+                                    color: '#991b1b',
+                                    fontWeight: 700,
+                                    fontSize: '0.7rem',
+                                    border: '1px solid #991b1b'
+                                }}
+                            />
+                        )}
+                    </Stack>
+                );
             }
         },
         {
@@ -539,26 +407,26 @@ const PaiementPage = () => {
             headerAlign: 'center', // Aligne le titre au centre
             align: 'center',       // Aligne le contenu de la cellule au centre
             renderCell: (params) => (
-                <Box sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'center', 
-                    alignItems: 'center', 
-                    width: '100%', 
-                    height: '100%' 
+                <Box sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    width: '100%',
+                    height: '100%'
                 }}>
-                    <IconButton 
+                    <IconButton
                         size="small"
                         onClick={() => handleShowEmailHistory(params.row)}
                         sx={{ padding: '4px' }} // Réduit le padding pour que le badge reste bien centré
                     >
-                        <Badge 
-                            badgeContent={params.value} 
+                        <Badge
+                            badgeContent={params.value}
                             color="primary"
                             slotProps={{ badge: { style: { fontSize: '0.65rem', height: '16px', minWidth: '16px' } } }}
                         >
-                            <EmailIcon 
-                                fontSize="small" 
-                                sx={{ color: params.value > 0 ? '#2563EB' : '#94a3b8' }} 
+                            <EmailIcon
+                                fontSize="small"
+                                sx={{ color: params.value > 0 ? '#2563EB' : '#94a3b8' }}
                             />
                         </Badge>
                     </IconButton>
@@ -566,67 +434,60 @@ const PaiementPage = () => {
             )
         },
         {
-        field: 'actions',
-        headerName: 'ACTIONS',
-        width: 175,
-        renderCell: (p) => (
-            <Stack direction="row" spacing={0.5}>
-                {/* Bouton dynamique : Valider OU Dévalider */}
-                { showComponent &&
-                    <IconButton 
-                        size="small" 
-                        onClick={() => handleToggleValidation(p.row)} 
-                        sx={{ color: p.row.valide ? '#ed6c02' : '#059669' }} // Orange si validé, Vert sinon
-                        title={p.row.valide ? "Dévalider" : "Valider"}
-                    >
-                        {p.row.valide ? (
-                        <SettingsBackupRestoreIcon fontSize="small" /> 
-                        ) : (
-                        <CheckCircleOutlineIcon fontSize="small" />
-                        )}
-                    </IconButton>
-                }
-
-                { showComponent &&
-                    <IconButton 
-                        disabled={!p.row.valide}
-                        onClick={() => {
-                            setSelectedRow(p.row); // On capture la ligne (id, nom, prenom)
-                            setSingleModalOpen(true);   // On ouvre le popup
-                        }}
-                    >
-                        <ForwardToInboxIcon sx={{ color: '#2563EB', fontSize: '20px' }} />
-                    </IconButton>
-                }
-
-                {/* Bouton Impression Ticket */}
-                <PDFDownloadLink 
-                    document={<TicketCaissePDF row={p.row} exercice={exercices}/>} 
-                    fileName={`Ticket_${p.row.ref_seq || p.row.id}.pdf`}
-                    style={{ textDecoration: 'none' }}
-                >
-                    {({ loading }) => (
-                        <IconButton 
-                            size="small" 
-                            sx={{ color: '#1b4332' }} 
-                            disabled={loading}
-                            title="Imprimer le ticket"
+            field: 'actions',
+            headerName: 'ACTIONS',
+            width: 175,
+            renderCell: (p) => (
+                <Stack direction="row" spacing={0.5}>
+                    {/* Bouton dynamique : Valider OU Dévalider */}
+                    {showComponent &&
+                        <IconButton
+                            size="small"
+                            onClick={() => handleToggleValidation(p.row)}
+                            sx={{ color: p.row.valide ? '#ed6c02' : '#059669' }} // Orange si validé, Vert sinon
+                            title={p.row.valide ? "Dévalider" : "Valider"}
                         >
-                            {loading ? <CircularProgress size={16} /> : <LocalPrintshopOutlined fontSize="small" />}
+                            {p.row.valide ? (
+                                <SettingsBackupRestoreIcon fontSize="small" />
+                            ) : (
+                                <CheckCircleOutlineIcon fontSize="small" />
+                            )}
                         </IconButton>
-                    )}
-                </PDFDownloadLink>
+                    }
 
-                <IconButton 
-                    size="small" 
-                    disabled={p.row.valide}
-                    onClick={() => handleDelete(p.row.id)} 
-                    sx={{ color: '#dc2626' }}
-                >
-                    <DeleteOutlineIcon fontSize="small" />
-                </IconButton>
-            </Stack>
-        )
+                    {showComponent &&
+                        <IconButton
+                            disabled={!p.row.valide}
+                            onClick={() => {
+                                setSelectedRow(p.row); // On capture la ligne (id, nom, prenom)
+                                setSingleModalOpen(true);   // On ouvre le popup
+                            }}
+                        >
+                            <ForwardToInboxIcon sx={{ color: '#2563EB', fontSize: '20px' }} />
+                        </IconButton>
+                    }
+
+                    {/* Bouton Impression Ticket */}
+                    <IconButton
+                        onClick={() => handlePrintCaisse(p.row, exercices, orderInfo, selectedEx)}
+                        size="small"
+                        sx={{ color: '#1b4332' }}
+                        disabled={loading}
+                        title="Imprimer le ticket"
+                    >
+                        {loading ? <CircularProgress size={16} /> : <LocalPrintshopOutlined fontSize="small" />}
+                    </IconButton>
+
+                    <IconButton
+                        size="small"
+                        disabled={p.row.valide}
+                        onClick={() => handleDelete(p.row.id)}
+                        sx={{ color: '#dc2626' }}
+                    >
+                        <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                </Stack>
+            )
         }
     ];
 
@@ -640,7 +501,7 @@ const PaiementPage = () => {
             const response = await axiosPrivate.get('/api/paiements', {
                 params: { exerciceId: exerciceId }
             });
-            
+
             // Avec Axios, les données sont directement dans response.data
             setRows(response.data);
         } catch (error) {
@@ -677,8 +538,8 @@ const PaiementPage = () => {
             // Succès : on ferme, on reset et on recharge
             setOpenModal(false);
             setForm(initialForm);
-            loadPaiements(selectedEx); 
-            
+            loadPaiements(selectedEx);
+
             // Optionnel : ajouter un toast de succès ici
         } catch (error) {
             console.error("Erreur lors de l'enregistrement:", error);
@@ -711,8 +572,8 @@ const PaiementPage = () => {
 
     // --- COMPOSANT DE DIALOGUE GÉNÉRIQUE ---
     const ConfirmationDialog = () => (
-        <Dialog 
-            open={confirmDialog.open} 
+        <Dialog
+            open={confirmDialog.open}
             onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
             PaperProps={{ sx: { borderRadius: '10px', p: 1 } }}
         >
@@ -723,14 +584,14 @@ const PaiementPage = () => {
                 </Typography>
             </DialogContent>
             <DialogActions sx={{ pb: 2, px: 3 }}>
-                <Button 
+                <Button
                     onClick={() => setConfirmDialog({ ...confirmDialog, open: false })}
                     sx={{ color: '#64748b', textTransform: 'none' }}
                 >
                     Annuler
                 </Button>
-                <Button 
-                    variant="contained" 
+                <Button
+                    variant="contained"
                     color={confirmDialog.color}
                     onClick={() => {
                         confirmDialog.onConfirm();
@@ -781,32 +642,32 @@ const PaiementPage = () => {
     const totalAutre = rows.reduce((sum, row) => sum + (Number(row.autre) || 0), 0);
     const grandTotal = totalAnouveau + totalCotisation + totalAutre;
 
-    const CustomFooter = () => (
-        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-            {/* Ligne des Totaux */}
-            <Box sx={{ 
-            display: 'flex', p: 1, bgcolor: '#cce4da', 
-            borderTop: '1px solid #e2e8f0', fontWeight: 800, fontSize: '0.95rem' 
-        }}>
-        <Typography variant="caption" sx={{ fontSize: '0.95rem', fontWeight: 800, flex: 1, ml: 2, color: '#64748b' }}>
-            TOTAL {rows.length > 0 ? `(${rows.length} lignes)` : ''}
-        </Typography>
-        
-        <Stack direction="row" spacing={0} sx={{ textAlign: 'right', mr: '235px' }}> 
-            {/* mr: 100px correspond à la largeur de ta colonne Actions pour rester aligné */}
-            <Box sx={{ width: 180 }}>{totalAnouveau.toLocaleString('fr-FR')} Ar</Box>
-            <Box sx={{ width: 180 }}>{totalCotisation.toLocaleString('fr-FR')} Ar</Box>
-            <Box sx={{ width: 180 }}>{totalAutre.toLocaleString('fr-FR')} Ar</Box>
-            <Box sx={{ width: 180, color: '#1b4332' }}>{grandTotal.toLocaleString('fr-FR')} Ar</Box>
-        </Stack>
-        </Box>
-        
-        <Divider />
-        
-        {/* Pagination Native */}
-        <GridPagination />
-    </Box>
-    );
+    // const CustomFooter = () => (
+    //     <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+    //         {/* Ligne des Totaux */}
+    //         <Box sx={{
+    //             display: 'flex', p: 1, bgcolor: '#cce4da',
+    //             borderTop: '1px solid #e2e8f0', fontWeight: 800, fontSize: '0.95rem'
+    //         }}>
+    //             <Typography variant="caption" sx={{ fontSize: '0.95rem', fontWeight: 800, flex: 1, ml: 2, color: '#64748b' }}>
+    //                 TOTAL {rows.length > 0 ? `(${rows.length} lignes)` : ''}
+    //             </Typography>
+
+    //             <Stack direction="row" spacing={0} sx={{ textAlign: 'right', mr: '235px' }}>
+    //                 {/* mr: 100px correspond à la largeur de ta colonne Actions pour rester aligné */}
+    //                 <Box sx={{ width: 180 }}>{totalAnouveau.toLocaleString('fr-FR')} Ar</Box>
+    //                 <Box sx={{ width: 180 }}>{totalCotisation.toLocaleString('fr-FR')} Ar</Box>
+    //                 <Box sx={{ width: 180 }}>{totalAutre.toLocaleString('fr-FR')} Ar</Box>
+    //                 <Box sx={{ width: 180, color: '#1b4332' }}>{grandTotal.toLocaleString('fr-FR')} Ar</Box>
+    //             </Stack>
+    //         </Box>
+
+    //         <Divider />
+
+    //         {/* Pagination Native */}
+    //         <GridPagination />
+    //     </Box>
+    // );
 
     //formatage date exercice
     const getFullExerciceLabel = () => {
@@ -820,724 +681,816 @@ const PaiementPage = () => {
     };
 
     //export Excel
-      const handleExportExcel = () => {
-      const currentRows = rows;
-      const periode = getFullExerciceLabel();
-    
-      // --- CONFIGURATION DES STYLES ---
-      const styleHeader = {
-        fill: { fgColor: { rgb: "1B4332" } }, // Vert foncé OECFM
-        font: { color: { rgb: "FFFFFF" }, bold: true, sz: 10 },
-        alignment: { horizontal: "center", vertical: "center", wrapText: true },
-        border: { 
-          top: { style: "thin", color: { rgb: "000000" } },
-          bottom: { style: "thin", color: { rgb: "000000" } }
-        }
-      };
-    
-      const styleFooter = {
-        fill: { fgColor: { rgb: "DCFCE7" } }, // Vert clair
-        font: { bold: true, color: { rgb: "1B4332" } },
-        alignment: { horizontal: "right" }
-      };
-    
-      // Style numérique avec séparateur de milliers (Espace pour la localisation FR/MG)
-      const styleCellNum = { 
-        numFmt: "#,##0", 
-        alignment: { horizontal: "right" },
-        font: { sz: 10 }
-      };
+    const handleExportExcel = () => {
+        const currentRows = rows;
+        const periode = getFullExerciceLabel();
 
-      const styleCellDate = { 
-        numFmt: "dd/mm/yyyy", 
-        alignment: { horizontal: "center" }, // Souvent centré pour les dates
-        font: { sz: 10 }
-    };
-    
-      const styleText = { font: { sz: 10 } };
-    
-      // --- CONSTRUCTION DES DONNÉES ---
-      const wsData = [
-        [{ v: "OECFM", s: { font: { bold: true, sz: 14, color: { rgb: "1B4332" } } } }],
-        [{ v: "Ordre des Experts Comptables et Financiers de Madagascar", s: { font: { italic: true, sz: 10 } } }],
-        [""],
-        [{ v: "TABLEAU DES PAIEMENTS DE COTISATIONS", s: { font: { bold: true, sz: 12 } } }],
-        [`Période : ${periode}`],
-        [""],
-    ];
-    
-      // Entête du tableau avec TOUTES les colonnes
-      const headerCols = [
-        { v: "Edition", s: styleHeader },
-        { v: "Date paiement", s: styleHeader },
-        { v: "Matricule", s: styleHeader },
-        { v: "Nom & Prénoms", s: styleHeader },
-        { v: "Détails paiement / référence", s: styleHeader },
-        { v: "Pai. anouveaux", s: styleHeader },
-        { v: "Pai. cotis année", s: styleHeader },
-        { v: "Pai. autre appel", s: styleHeader },
-        { v: "Total payé", s: styleHeader },
-        { v: "Validé", s: styleHeader },
-      ];
-      wsData.push(headerCols);
-    
-      // Lignes de données
-      currentRows.forEach(row => {
-        const rowLine = [
-            { v: new Date (row.created_at).toLocaleDateString('fr-FR'), s: styleCellDate },
-            { v: new Date (row.date).toLocaleDateString('fr-FR'), s: styleCellDate },
-            { v: row.matricule, s: styleText },
-            { v: `${row.nom} ${row.prenom}`, s: styleText },
-            { v: row.reference, s: styleText },
-            { v: parseFloat(row.anouveau) || 0, s: styleCellNum },
-            { v: parseFloat(row.cotisation) || 0, s: styleCellNum },
-            { v: parseFloat(row.autre) || 0, s: styleCellNum },
-            { v: parseFloat(row.total) || 0, s: styleCellNum },
-            { v: row.valide === true ? "Validé" : "Non validé", s: styleText },
+        // --- CONFIGURATION DES STYLES ---
+        const styleHeader = {
+            fill: { fgColor: { rgb: "1B4332" } }, // Vert foncé OECFM
+            font: { color: { rgb: "FFFFFF" }, bold: true, sz: 10 },
+            alignment: { horizontal: "center", vertical: "center", wrapText: true },
+            border: {
+                top: { style: "thin", color: { rgb: "000000" } },
+                bottom: { style: "thin", color: { rgb: "000000" } }
+            }
+        };
+
+        const styleFooter = {
+            fill: { fgColor: { rgb: "DCFCE7" } }, // Vert clair
+            font: { bold: true, color: { rgb: "1B4332" } },
+            alignment: { horizontal: "right" }
+        };
+
+        // Style numérique avec séparateur de milliers (Espace pour la localisation FR/MG)
+        const styleCellNum = {
+            numFmt: "#,##0",
+            alignment: { horizontal: "right" },
+            font: { sz: 10 }
+        };
+
+        const styleCellDate = {
+            numFmt: "dd/mm/yyyy",
+            alignment: { horizontal: "center" }, // Souvent centré pour les dates
+            font: { sz: 10 }
+        };
+
+        const styleText = { font: { sz: 10 } };
+
+        // --- CONSTRUCTION DES DONNÉES ---
+        const wsData = [
+            [{ v: "OECFM", s: { font: { bold: true, sz: 14, color: { rgb: "1B4332" } } } }],
+            [{ v: "Ordre des Experts Comptables et Financiers de Madagascar", s: { font: { italic: true, sz: 10 } } }],
+            [""],
+            [{ v: "TABLEAU DES PAIEMENTS DE COTISATIONS", s: { font: { bold: true, sz: 12 } } }],
+            [`Période : ${periode}`],
+            [""],
         ];
-        
-        wsData.push(rowLine);
-      });
-    
-      // --- LIGNE DE TOTAL (FOOTER) ---
-      const totalAnouveau = currentRows.reduce((sum, r) => sum + parseFloat(r.anouveau || 0), 0);
-      const totalCotisation = currentRows.reduce((sum, r) => sum + parseFloat(r.cotisation || 0), 0);
-      const totalAutre = currentRows.reduce((sum, r) => sum + parseFloat(r.autre || 0), 0);
-      const total = currentRows.reduce((sum, r) => sum + parseFloat(r.total || 0), 0);
-    
-      // On aligne le "TOTAL GÉNÉRAL" sous la colonne Statut
-      const footerRow = [
-        { v: "", s: styleFooter }, { v: "", s: styleFooter }, { v: "", s: styleFooter }, 
-        { v: "", s: styleFooter },
-        { v: "TOTAL GÉNÉRAL", s: styleFooter },
-        { v: totalAnouveau, s: { ...styleFooter, ...styleCellNum } },
-        { v: totalCotisation, s: { ...styleFooter, ...styleCellNum } },
-        { v: totalAutre, s: { ...styleFooter, ...styleCellNum } },
-        { v: total, s: { ...styleFooter, ...styleCellNum } }
-      ];
-    
-      wsData.push(footerRow);
-    
-      // --- GÉNÉRATION DU FICHIER ---
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      
-      // Largeur des colonnes adaptée
-      ws['!cols'] = [
-        { wch: 10 }, { wch: 35 }, { wch: 12 }, { wch: 12 }, 
-        { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 18 }, 
-        { wch: 18 }, { wch: 18 }
-      ];
-      
-      // Fusions pour l'en-tête institutionnel
-      ws['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }, 
-        { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } }
-      ];
 
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "paiement");
-      XLSX.writeFile(wb, `OECFM_Export_paiement.xlsx`);
+        // Entête du tableau avec TOUTES les colonnes
+        const headerCols = [
+            { v: "Edition", s: styleHeader },
+            { v: "Date paiement", s: styleHeader },
+            { v: "Matricule", s: styleHeader },
+            { v: "Nom & Prénoms", s: styleHeader },
+            { v: "Détails paiement / référence", s: styleHeader },
+            { v: "Pai. anouveaux", s: styleHeader },
+            { v: "Pai. cotis année", s: styleHeader },
+            { v: "Pai. autre appel", s: styleHeader },
+            { v: "Total payé", s: styleHeader },
+            { v: "Validé", s: styleHeader },
+        ];
+        wsData.push(headerCols);
+
+        // Lignes de données
+        currentRows.forEach(row => {
+            const rowLine = [
+                { v: new Date(row.created_at).toLocaleDateString('fr-FR'), s: styleCellDate },
+                { v: new Date(row.date).toLocaleDateString('fr-FR'), s: styleCellDate },
+                { v: row.matricule, s: styleText },
+                { v: `${row.nom} ${row.prenom}`, s: styleText },
+                { v: row.reference, s: styleText },
+                { v: parseFloat(row.anouveau) || 0, s: styleCellNum },
+                { v: parseFloat(row.cotisation) || 0, s: styleCellNum },
+                { v: parseFloat(row.autre) || 0, s: styleCellNum },
+                { v: parseFloat(row.total) || 0, s: styleCellNum },
+                { v: row.valide === true ? "Validé" : "Non validé", s: styleText },
+            ];
+
+            wsData.push(rowLine);
+        });
+
+        // --- LIGNE DE TOTAL (FOOTER) ---
+        const totalAnouveau = currentRows.reduce((sum, r) => sum + parseFloat(r.anouveau || 0), 0);
+        const totalCotisation = currentRows.reduce((sum, r) => sum + parseFloat(r.cotisation || 0), 0);
+        const totalAutre = currentRows.reduce((sum, r) => sum + parseFloat(r.autre || 0), 0);
+        const total = currentRows.reduce((sum, r) => sum + parseFloat(r.total || 0), 0);
+
+        // On aligne le "TOTAL GÉNÉRAL" sous la colonne Statut
+        const footerRow = [
+            { v: "", s: styleFooter }, { v: "", s: styleFooter }, { v: "", s: styleFooter },
+            { v: "", s: styleFooter },
+            { v: "TOTAL GÉNÉRAL", s: styleFooter },
+            { v: totalAnouveau, s: { ...styleFooter, ...styleCellNum } },
+            { v: totalCotisation, s: { ...styleFooter, ...styleCellNum } },
+            { v: totalAutre, s: { ...styleFooter, ...styleCellNum } },
+            { v: total, s: { ...styleFooter, ...styleCellNum } }
+        ];
+
+        wsData.push(footerRow);
+
+        // --- GÉNÉRATION DU FICHIER ---
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+        // Largeur des colonnes adaptée
+        ws['!cols'] = [
+            { wch: 10 }, { wch: 35 }, { wch: 12 }, { wch: 12 },
+            { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 18 },
+            { wch: 18 }, { wch: 18 }
+        ];
+
+        // Fusions pour l'en-tête institutionnel
+        ws['!merges'] = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } }
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "paiement");
+        XLSX.writeFile(wb, `OECFM_Export_paiement.xlsx`);
     };
 
     const fNum = (val) => {
         if (val === undefined || val === null) return "0";
-        
+
         // 1. On convertit en entier pour enlever les virgules si besoin
         // 2. On utilise une regex pour ajouter un espace tous les 3 chiffres
         return val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
     };
 
     //export PDF du ticket de caisse
-    const TicketCaissePDF = ({ row , exercice}) => {
-        const data = Array.isArray(orderInfo) ? orderInfo[0] : orderInfo;
-        const url = URL;
-        
-        // On utilise l'accession sécurisée
-        const nom_tresorier = data?.noms_signataires?.["Trésorier"] || "Nom inconnu";
-        const nom_vice_president_admin = data?.noms_signataires?.["Vice-Président Administratif"] || "Nom inconnu";
-        const nom_caissier = data?.noms_signataires?.["Caissier"] || "Nom inconnu";
+    // const TicketCaissePDF = ({ row, exercice }) => {
+    //     const data = Array.isArray(orderInfo) ? orderInfo[0] : orderInfo;
+    //     const url = URL;
 
-        // Fonction pour extraire "AAAA - AAAA"
-        const formatExercice = () => {
-            const ex = exercice.find(e => e.id === selectedEx);
-            if (!ex) return "";
-            const start = new Date(ex.date_debut).getFullYear();
-            const end = new Date(ex.date_fin).getFullYear();
-            return `${start} - ${end}`;
-        }
+    //     // On utilise l'accession sécurisée
+    //     const nom_tresorier = data?.noms_signataires?.["Trésorier"] || "Nom inconnu";
+    //     const nom_vice_president_admin = data?.noms_signataires?.["Vice-Président Administratif"] || "Nom inconnu";
+    //     const nom_caissier = data?.noms_signataires?.["Caissier"] || "Nom inconnu";
 
-        const nombreEnLettres = (valeurEntrante) => {
-            const nb = Math.abs(parseInt(valeurEntrante, 10));
+    //     // Fonction pour extraire "AAAA - AAAA"
+    //     const formatExercice = () => {
+    //         const ex = exercice.find(e => e.id === selectedEx);
+    //         if (!ex) return "";
+    //         const start = new Date(ex.date_debut).getFullYear();
+    //         const end = new Date(ex.date_fin).getFullYear();
+    //         return `${start} - ${end}`;
+    //     }
 
-            const unites = ["", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf"];
-            const dizaines = ["", "dix", "vingt", "trente", "quarante", "cinquante", "soixante", "soixante-dix", "quatre-vingt", "quatre-vingt-dix"];
-            
-            if (isNaN(nb)) return "";
-            if (nb === 0) return "zéro";
+    //     const nombreEnLettres = (valeurEntrante) => {
+    //         const nb = Math.abs(parseInt(valeurEntrante, 10));
 
-            const conv = (n) => {
-                if (n < 10) return unites[n];
-                
-                if (n < 20) {
-                    const exceptions = {10:"dix", 11:"onze", 12:"douze", 13:"treize", 14:"quatorze", 15:"quinze", 16:"seize"};
-                    return exceptions[n] || "dix-" + unites[n-10];
-                }
-                
-                if (n < 100) {
-                    const d = Math.floor(n / 10);
-                    const r = n % 10;
-                    if (d === 7) return "soixante-" + (r === 1 ? "et-onze" : conv(10 + r));
-                    if (d === 9) return "quatre-vingt-" + conv(10 + r);
-                    const liaison = (r === 1 && d < 8) ? " et " : "-";
-                    return dizaines[d] + (r === 0 ? "" : liaison + unites[r]);
-                }
-                
-                if (n < 1000) {
-                    const c = Math.floor(n / 100);
-                    const r = n % 100;
-                    const centStr = c === 1 ? "cent" : unites[c] + " cent";
-                    return (centStr + " " + conv(r)).trim();
-                }
-                
-                if (n < 1000000) {
-                    const m = Math.floor(n / 1000);
-                    const r = n % 1000;
-                    const milleStr = m === 1 ? "mille" : conv(m) + " mille";
-                    return (milleStr + " " + conv(r)).trim();
-                }
-                
-                // NOUVEAU : Gestion des Millions
-                if (n < 1000000000) {
-                    const mil = Math.floor(n / 1000000);
-                    const r = n % 1000000;
-                    const millionStr = mil === 1 ? "un million" : conv(mil) + " millions";
-                    return (millionStr + " " + conv(r)).trim();
-                }
+    //         const unites = ["", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf"];
+    //         const dizaines = ["", "dix", "vingt", "trente", "quarante", "cinquante", "soixante", "soixante-dix", "quatre-vingt", "quatre-vingt-dix"];
 
-                // NOUVEAU : Gestion des Milliards
-                if (n < 1000000000000) {
-                    const mrd = Math.floor(n / 1000000000);
-                    const r = n % 1000000000;
-                    const milliardStr = mrd === 1 ? "un milliard" : conv(mrd) + " milliards";
-                    return (milliardStr + " " + conv(r)).trim();
-                }
-                
-                return n.toString();
-            };
+    //         if (isNaN(nb)) return "";
+    //         if (nb === 0) return "zéro";
 
-            return conv(nb).trim().toLowerCase().replace(/\s+/g, ' ');
-        };
+    //         const conv = (n) => {
+    //             if (n < 10) return unites[n];
 
-        return (
-            <Document>
-            <Page size="A4" style={{ padding: 40, fontSize: 10, fontFamily: 'Helvetica' }}>
-            {/* Header avec Logo (Placeholder) */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                {/* LOGO à gauche */}
-                <View style={{ width: 100, height: 100, backgroundColor: 'transparent', borderRadius: 30 }} >
-                    <Image 
-                        style={{width: 100, height: 100, marginRight: 10, objectFit: 'contain'}}
-                        src="/logo500.png" // Assure-toi que le nom du fichier est exact
-                    />
-                </View>
+    //             if (n < 20) {
+    //                 const exceptions = { 10: "dix", 11: "onze", 12: "douze", 13: "treize", 14: "quatorze", 15: "quinze", 16: "seize" };
+    //                 return exceptions[n] || "dix-" + unites[n - 10];
+    //             }
 
-                {/* BLOC TEXTE à droite */}
-                <View style={{ marginLeft: 0, marginBottom: 0 }}>
-                    <View style={{ 
-                        flex: 1,               // Prend tout l'espace restant pour permettre l'alignement
-                        alignItems: 'flex-end' // Aligne le conteneur lui-même vers la droite
-                    }}>
-                        <Text style={{ fontSize: 8, textAlign: 'right' }}>
-                            Régie par l'Ordonnance modifiée n°92-047 du 05/11/1992
-                        </Text>
-                        <Text style={{ fontSize: 8, textAlign: 'right' }}>
-                            {data.adresse}
-                        </Text>
-                        <Text style={{ fontSize: 8, textAlign: 'right' }}>
-                            8737 - ({data.boite_postale}) ANTANANARIVO - Tel : {data.telephone} - E-mail :{" "}
-                            <Text style={{ color: "blue", textDecorationLine: "underline" }}>
-                                {data.email}
-                            </Text>
-                        </Text>
-                    </View>
+    //             if (n < 100) {
+    //                 const d = Math.floor(n / 10);
+    //                 const r = n % 10;
+    //                 if (d === 7) return "soixante-" + (r === 1 ? "et-onze" : conv(10 + r));
+    //                 if (d === 9) return "quatre-vingt-" + conv(10 + r);
+    //                 const liaison = (r === 1 && d < 8) ? " et " : "-";
+    //                 return dizaines[d] + (r === 0 ? "" : liaison + unites[r]);
+    //             }
 
-                    <View style={{ marginLeft: 0, marginBottom: 0 }}>
-                        {/* Première ligne */}
-                        <Text style={{ fontSize: 8 }}>
-                            <Text style={{ textDecoration: 'underline' }}>Membre de :</Text>
-                            {" "} - L'international Federation of Accountants (IFAC)
-                        </Text>
+    //             if (n < 1000) {
+    //                 const c = Math.floor(n / 100);
+    //                 const r = n % 100;
+    //                 const centStr = c === 1 ? "cent" : unites[c] + " cent";
+    //                 return (centStr + " " + conv(r)).trim();
+    //             }
 
-                        <View style={{ marginLeft: 50, marginBottom: 10 }}>
-                            {/* Deuxième ligne décalée vers le bas avec un petit marginTop */}
-                            <Text style={{ fontSize: 8, marginTop: 4 }}>
-                                - Pan African Federation of Accountants (PAFA)
-                            </Text>
-                            <Text style={{ fontSize: 8, marginTop: 4 }}>
-                                - La Fédération Internationale Des Experts comptables Francophones (FIDEF)
-                            </Text>
-                        </View>
-                    </View>
-                </View>
-            </View>
-            
-            <View style={{
-                borderBottomColor: '#e2e8f0', // Couleur grise légère (style Pennylane)
-                borderBottomWidth: 1,         // Épaisseur du trait
-                marginTop: 10,                // Espace au-dessus
-                marginBottom: 0,             // Espace en-dessous
-                marginLeft: 20,              // Pour l'aligner avec vos textes décalés
-                marginRight: 20               // Pour ne pas qu'il touche le bord droit
-            }} />
-            
-            <Text style={{ textAlign: 'center', fontSize: 16, fontWeight: 'bold', marginVertical: 20, textDecoration: 'none' }}>
-                Ticket de caisse {row.valide ? "": "(Non validé)"}
-            </Text>
+    //             if (n < 1000000) {
+    //                 const m = Math.floor(n / 1000);
+    //                 const r = n % 1000;
+    //                 const milleStr = m === 1 ? "mille" : conv(m) + " mille";
+    //                 return (milleStr + " " + conv(r)).trim();
+    //             }
 
-            <View style={{ marginBottom: 20, lineHeight: 1 }}>
-                <Text>Date d'édition : {new Date(row.created_at).toLocaleDateString('fr-FR')}</Text>
-                <Text>Date de paiement : {new Date(row.date).toLocaleDateString('fr-FR')}</Text>
-                <Text>Exercice : {formatExercice(exercice)}</Text>
-                <Text>Référence : {row.num_ticket}</Text>
-                <Text>Nom : {row.nom}</Text>
-                <Text>Prénom (s) : {row.prenom}</Text>
-            </View>
+    //             // NOUVEAU : Gestion des Millions
+    //             if (n < 1000000000) {
+    //                 const mil = Math.floor(n / 1000000);
+    //                 const r = n % 1000000;
+    //                 const millionStr = mil === 1 ? "un million" : conv(mil) + " millions";
+    //                 return (millionStr + " " + conv(r)).trim();
+    //             }
 
-            {/* Tableau des règlements */}
-            <View style={{ border: '1pt solid #000' }}>
-                <View style={{ flexDirection: 'row', backgroundColor: '#f0fdf4', fontWeight: 'bold', borderBottom: '1pt solid #000', padding: 5 }}>
-                <Text style={{ flex: 2 }}>Détail du règlement</Text>
-                <Text style={{ flex: 1, textAlign: 'right' }}>Paiement</Text>
-                </View>
-                {[
-                { label: "Sur solde A nouveau", val: row.anouveau? row.anouveau : 0 },
-                { label: `Sur cotisation de l'exercice ${formatExercice(exercice)}`, val: row.cotis_annee? row.cotis_annee: 0 },
-                { label: `Sur autre appel ${formatExercice(exercice)}`, val: row.autre_appel? row.autre_appel: 0 }
-                ].map((item, i) => (
-                <View key={i} style={{ flexDirection: 'row', borderBottom: '0.5pt solid #eee', padding: 5 }}>
-                    <Text style={{ flex: 2 }}>{item.label}</Text>
-                    <Text style={{ flex: 1, textAlign: 'right' }}>{fNum(item.val)} Ar</Text>
-                </View>
-                ))}
-                <View style={{ flexDirection: 'row', padding: 5, fontWeight: 'bold', backgroundColor: '#f8fafc' }}>
-                <Text style={{ flex: 2 }}>Total payé</Text>
-                <Text style={{ flex: 1, textAlign: 'right' }}>{fNum(row.total)} Ar</Text>
-                </View>
-            </View>
+    //             // NOUVEAU : Gestion des Milliards
+    //             if (n < 1000000000000) {
+    //                 const mrd = Math.floor(n / 1000000000);
+    //                 const r = n % 1000000000;
+    //                 const milliardStr = mrd === 1 ? "un milliard" : conv(mrd) + " milliards";
+    //                 return (milliardStr + " " + conv(r)).trim();
+    //             }
 
-            <Text style={{ marginTop: 20, fontStyle: 'italic' }}>
-                Arrêté à la somme de : {nombreEnLettres(row.total)} Ariary
-            </Text>
+    //             return n.toString();
+    //         };
 
-            {/* Signatures */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 50 }}>
-                <View style={{width:220, flexDirection: 'column', justifyContent: 'space-between', marginTop: 0, alignContent:'center', alignItems:'center' }}>
-                    <Text style={{textAlign: 'center'}}>Le Vice-Président</Text>
-                    <Text style={{textAlign: 'center'}}>Administratif</Text>
-                    {row.valide &&
-                        <Image
-                            style={{ width: 100, height: 100, objectFit: 'contain' }}
-                            src={`${url}/uploads/signatures/${data.sig_vice_president_admin}`}
-                        />
-                    }
-                    <Text style={{marginTop : row.valide? 0 : 50, textAlign: 'center'}}>{nom_vice_president_admin}</Text>
-                </View>
+    //         return conv(nb).trim().toLowerCase().replace(/\s+/g, ' ');
+    //     };
 
-                <View style={{width:220, flexDirection: 'column', justifyContent: 'space-between', marginTop: 0, alignContent:'center', alignItems:'center' }}>
-                    <Text style={{textAlign: 'center'}}>Le Trésorier</Text>
-                    {row.valide &&
-                        <Image
-                            style={{ width: 100, height: 100, objectFit: 'contain' }}
-                            src={`${url}/uploads/signatures/${data.sig_tresorier}`}
-                        />
-                    }
-                    <Text style={{marginTop : row.valide? 0 : 50, textAlign: 'center'}}>{nom_tresorier}</Text>
-                </View>
+    //     return (
+    //         <Document>
+    //             <Page size="A4" style={{ padding: 40, fontSize: 10, fontFamily: 'Helvetica' }}>
+    //                 {/* Header avec Logo (Placeholder) */}
+    //                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+    //                     {/* LOGO à gauche */}
+    //                     <View style={{ width: 100, height: 100, backgroundColor: 'transparent', borderRadius: 30 }} >
+    //                         <Image
+    //                             style={{ width: 100, height: 100, marginRight: 10, objectFit: 'contain' }}
+    //                             src="/logo500.png" // Assure-toi que le nom du fichier est exact
+    //                         />
+    //                     </View>
 
-                <View style={{width:220, flexDirection: 'column', justifyContent: 'space-between', marginTop: 0, alignContent:'center', alignItems:'center' }}>
-                    <Text style={{textAlign: 'center'}}>Le Caissier</Text>
-                    {row.valide &&
-                        <Image
-                            style={{ width: 100, height: 100, objectFit: 'contain' }}
-                            src={`${url}/uploads/signatures/${data.sig_caissier}`}
-                        />
-                    }
-                    <Text style={{marginTop : row.valide? 0 : 50, textAlign: 'center'}}>{nom_caissier}</Text>
-                </View>
+    //                     {/* BLOC TEXTE à droite */}
+    //                     <View style={{ marginLeft: 0, marginBottom: 0 }}>
+    //                         <View style={{
+    //                             flex: 1,               // Prend tout l'espace restant pour permettre l'alignement
+    //                             alignItems: 'flex-end' // Aligne le conteneur lui-même vers la droite
+    //                         }}>
+    //                             <Text style={{ fontSize: 8, textAlign: 'right' }}>
+    //                                 Régie par l'Ordonnance modifiée n°92-047 du 05/11/1992
+    //                             </Text>
+    //                             <Text style={{ fontSize: 8, textAlign: 'right' }}>
+    //                                 {data.adresse}
+    //                             </Text>
+    //                             <Text style={{ fontSize: 8, textAlign: 'right' }}>
+    //                                 8737 - ({data.boite_postale}) ANTANANARIVO - Tel : {data.telephone} - E-mail :{" "}
+    //                                 <Text style={{ color: "blue", textDecorationLine: "underline" }}>
+    //                                     {data.email}
+    //                                 </Text>
+    //                             </Text>
+    //                         </View>
 
-                <Text style={{width:220, textAlign: 'center'}}>Le Remettant</Text>
-            </View>
-            </Page>
-        </Document>
-        );
-    }
+    //                         <View style={{ marginLeft: 0, marginBottom: 0 }}>
+    //                             {/* Première ligne */}
+    //                             <Text style={{ fontSize: 8 }}>
+    //                                 <Text style={{ textDecoration: 'underline' }}>Membre de :</Text>
+    //                                 {" "} - L'international Federation of Accountants (IFAC)
+    //                             </Text>
+
+    //                             <View style={{ marginLeft: 50, marginBottom: 10 }}>
+    //                                 {/* Deuxième ligne décalée vers le bas avec un petit marginTop */}
+    //                                 <Text style={{ fontSize: 8, marginTop: 4 }}>
+    //                                     - Pan African Federation of Accountants (PAFA)
+    //                                 </Text>
+    //                                 <Text style={{ fontSize: 8, marginTop: 4 }}>
+    //                                     - La Fédération Internationale Des Experts comptables Francophones (FIDEF)
+    //                                 </Text>
+    //                             </View>
+    //                         </View>
+    //                     </View>
+    //                 </View>
+
+    //                 <View style={{
+    //                     borderBottomColor: '#e2e8f0', // Couleur grise légère (style Pennylane)
+    //                     borderBottomWidth: 1,         // Épaisseur du trait
+    //                     marginTop: 10,                // Espace au-dessus
+    //                     marginBottom: 0,             // Espace en-dessous
+    //                     marginLeft: 20,              // Pour l'aligner avec vos textes décalés
+    //                     marginRight: 20               // Pour ne pas qu'il touche le bord droit
+    //                 }} />
+
+    //                 <Text style={{ textAlign: 'center', fontSize: 16, fontWeight: 'bold', marginVertical: 20, textDecoration: 'none' }}>
+    //                     Ticket de caisse {row.valide ? "" : "(Non validé)"}
+    //                 </Text>
+
+    //                 <View style={{ marginBottom: 20, lineHeight: 1 }}>
+    //                     <Text>Date d'édition : {new Date(row.created_at).toLocaleDateString('fr-FR')}</Text>
+    //                     <Text>Date de paiement : {new Date(row.date).toLocaleDateString('fr-FR')}</Text>
+    //                     <Text>Exercice : {formatExercice(exercice)}</Text>
+    //                     <Text>Référence : {row.num_ticket}</Text>
+    //                     <Text>Nom : {row.nom}</Text>
+    //                     <Text>Prénom (s) : {row.prenom}</Text>
+    //                 </View>
+
+    //                 {/* Tableau des règlements */}
+    //                 <View style={{ border: '1pt solid #000' }}>
+    //                     <View style={{ flexDirection: 'row', backgroundColor: '#f0fdf4', fontWeight: 'bold', borderBottom: '1pt solid #000', padding: 5 }}>
+    //                         <Text style={{ flex: 2 }}>Détail du règlement</Text>
+    //                         <Text style={{ flex: 1, textAlign: 'right' }}>Paiement</Text>
+    //                     </View>
+    //                     {[
+    //                         { label: "Sur solde A nouveau", val: row.anouveau ? row.anouveau : 0 },
+    //                         { label: `Sur cotisation de l'exercice ${formatExercice(exercice)}`, val: row.cotis_annee ? row.cotis_annee : 0 },
+    //                         { label: `Sur autre appel ${formatExercice(exercice)}`, val: row.autre_appel ? row.autre_appel : 0 }
+    //                     ].map((item, i) => (
+    //                         <View key={i} style={{ flexDirection: 'row', borderBottom: '0.5pt solid #eee', padding: 5 }}>
+    //                             <Text style={{ flex: 2 }}>{item.label}</Text>
+    //                             <Text style={{ flex: 1, textAlign: 'right' }}>{fNum(item.val)} Ar</Text>
+    //                         </View>
+    //                     ))}
+    //                     <View style={{ flexDirection: 'row', padding: 5, fontWeight: 'bold', backgroundColor: '#f8fafc' }}>
+    //                         <Text style={{ flex: 2 }}>Total payé</Text>
+    //                         <Text style={{ flex: 1, textAlign: 'right' }}>{fNum(row.total)} Ar</Text>
+    //                     </View>
+    //                 </View>
+
+    //                 <Text style={{ marginTop: 20, fontStyle: 'italic' }}>
+    //                     Arrêté à la somme de : {nombreEnLettres(row.total)} Ariary
+    //                 </Text>
+
+    //                 {/* Signatures */}
+    //                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 50 }}>
+    //                     <View style={{ width: 220, flexDirection: 'column', justifyContent: 'space-between', marginTop: 0, alignContent: 'center', alignItems: 'center' }}>
+    //                         <Text style={{ textAlign: 'center' }}>Le Vice-Président</Text>
+    //                         <Text style={{ textAlign: 'center' }}>Administratif</Text>
+    //                         {row.valide &&
+    //                             <Image
+    //                                 style={{ width: 100, height: 100, objectFit: 'contain' }}
+    //                                 src={`${url}/uploads/signatures/${data.sig_vice_president_admin}`}
+    //                             />
+    //                         }
+    //                         <Text style={{ marginTop: row.valide ? 0 : 50, textAlign: 'center' }}>{nom_vice_president_admin}</Text>
+    //                     </View>
+
+    //                     <View style={{ width: 220, flexDirection: 'column', justifyContent: 'space-between', marginTop: 0, alignContent: 'center', alignItems: 'center' }}>
+    //                         <Text style={{ textAlign: 'center' }}>Le Trésorier</Text>
+    //                         {row.valide &&
+    //                             <Image
+    //                                 style={{ width: 100, height: 100, objectFit: 'contain' }}
+    //                                 src={`${url}/uploads/signatures/${data.sig_tresorier}`}
+    //                             />
+    //                         }
+    //                         <Text style={{ marginTop: row.valide ? 0 : 50, textAlign: 'center' }}>{nom_tresorier}</Text>
+    //                     </View>
+
+    //                     <View style={{ width: 220, flexDirection: 'column', justifyContent: 'space-between', marginTop: 0, alignContent: 'center', alignItems: 'center' }}>
+    //                         <Text style={{ textAlign: 'center' }}>Le Caissier</Text>
+    //                         {row.valide &&
+    //                             <Image
+    //                                 style={{ width: 100, height: 100, objectFit: 'contain' }}
+    //                                 src={`${url}/uploads/signatures/${data.sig_caissier}`}
+    //                             />
+    //                         }
+    //                         <Text style={{ marginTop: row.valide ? 0 : 50, textAlign: 'center' }}>{nom_caissier}</Text>
+    //                     </View>
+
+    //                     <Text style={{ width: 220, textAlign: 'center' }}>Le Remettant</Text>
+    //                 </View>
+    //             </Page>
+    //         </Document>
+    //     );
+    // }
 
     const totalAnouveauPage = rows.reduce((sum, r) => sum + (Number(r.anouveau) || 0), 0);
     const totalCotisationPage = rows.reduce((sum, r) => sum + (Number(r.cotis_annee) || 0), 0);
-    const totalAutrePage = rows.reduce((sum, r) => sum + (Number(r.autre) || 0), 0);
+    const totalAutrePage = rows.reduce((sum, r) => sum + (Number(r.autre_appel) || 0), 0);
     const totalGeneral = rows.reduce((sum, r) => sum + (Number(r.total) || 0), 0);
+
+    //export tableau Appel vers pdf
+    const handlePrintPaiementTable = async (rows, exerciceLabel) => {
+        try {
+            setLoading(true);
+            const doc = (
+                <PaiementTableauPDF
+                    data={rows}
+                    exerciceLabel={exerciceLabel}
+                />
+            );
+
+            // 3. On crée un Blob et on l'ouvre dans un nouvel onglet
+            const blob = await pdf(doc).toBlob();
+            const url = window.URL.createObjectURL(blob);
+            window.open(url, '_blank');
+            setLoading(false);
+        } catch (error) {
+            console.error("Erreur impression:", error);
+            toast.error("Impossible de générer le PDF");
+        }
+    };
+
+    const handlePrintCaisse = async (row, exercices, orderInfo, selectedEx) => {
+        try {
+            setLoading(true);
+            const doc = (
+                <TicketCaissePDF
+                    row={row}
+                    exercice={exercices}
+                    selectedEx={selectedEx}
+                    orderInfo={orderInfo}
+                />
+            );
+
+            // 3. On crée un Blob et on l'ouvre dans un nouvel onglet
+            const blob = await pdf(doc).toBlob();
+            const url = window.URL.createObjectURL(blob);
+            window.open(url, '_blank');
+            setLoading(false);
+        } catch (error) {
+            console.error("Erreur impression:", error);
+            toast.error("Impossible de générer le PDF");
+        }
+    };
+
+    const CustomFooter = () => {
+        const apiRef = useGridApiContext();
+
+        // 1. On récupère l'état du filtrage directement
+        const filterLookup = apiRef.current.state.filter.filteredRowsLookup;
+
+        // 2. On récupère tous les IDs
+        const allIds = apiRef.current.getAllRowIds();
+
+        // 3. On ne garde que ceux qui sont à 'true' dans le lookup (ceux qui passent le filtre)
+        // Si le lookup n'existe pas encore, on prend tout par défaut
+        const visibleIds = filterLookup
+            ? allIds.filter((id) => filterLookup[id] !== false)
+            : allIds;
+
+        // 4. On récupère les lignes pour le calcul
+        const visibleRows = visibleIds.map((id) => apiRef.current.getRow(id));
+
+        // Calculs
+        const totalAnouveau = visibleRows.reduce((sum, row) => sum + (Number(row?.anouveau) || 0), 0);
+        const totalCotis_annee = visibleRows.reduce((sum, row) => sum + (Number(row?.cotis_annee) || 0), 0);
+        const totalAutre_appel = visibleRows.reduce((sum, row) => sum + (Number(row?.autre_appel) || 0), 0);
+        const total = visibleRows.reduce((sum, row) => sum + (Number(row?.total) || 0), 0);
+
+        const fNum = (val) => new Intl.NumberFormat('fr-FR').format(val);
+
+        return (
+            <GridFooterContainer sx={{ p: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#f8fafb' }}>
+                <Box sx={{ display: 'flex', gap: 3, ml: 2 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 'bold', color: '#1b4332' }}>
+                        TOTAL FILTRÉ :
+                    </Typography>
+                    <Typography variant="caption">
+                        Anouveaux: <strong>{fNum(totalAnouveau)} Ar</strong>
+                    </Typography>
+                    <Typography variant="caption">
+                        Cotisation de l'année: <strong>{fNum(totalCotis_annee)} Ar</strong>
+                    </Typography>
+                    <Typography variant="caption">
+                        Autres appels: <strong>{fNum(totalAutre_appel)} Ar</strong>
+                    </Typography>
+                    <Typography variant="caption">
+                        Total: <strong>{fNum(total)} Ar</strong>
+                    </Typography>
+                </Box>
+                <GridFooter />
+            </GridFooterContainer>
+        );
+    };
 
     return (
         <Box sx={{ p: 3, bgcolor: '#f1f5f9', minHeight: '100vh' }}>
-        {/* HEADER & FILTRE EXERCICE */}
-        <Box sx={{ mb: 3 }}>
-            <MyBreadcrumbs currentPath="paiement" />
-            <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a' }}>Paiements</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Gestion des paiements de cotisation</Typography>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 3 }} spacing={1}>
-                <Box sx={{ maxWidth: 400}}>
-                    <InputLabel sx={{ mb: 1, fontWeight: 700, fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Exercice de référence</InputLabel>
-                    <TextField select fullWidth size="small" value={selectedEx} onChange={(e) => setSelectedEx(e.target.value)} sx={{ bgcolor: 'white', '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e2e8f0' } }}>
-                        {exercices.map(ex => (
-                        <MenuItem key={ex.id} value={ex.id}>
-                            {ex.libelle} : {new Date(ex.date_debut).toLocaleDateString('fr-FR')} - {new Date(ex.date_fin).toLocaleDateString('fr-FR')}
-                        </MenuItem>
-                        ))}
-                    </TextField>
-                </Box>
-
-                <Box sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'flex-end', 
-                    mb: 3, 
-                    p: 2,
-                    bgcolor: '#ffffff',
-                    borderRadius: '8px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)'
-                }}>
-                    {/* DROITE : Les 4 Totaux */}
-                    <Stack direction="row" spacing={4} sx={{ mb: 0.5 }}>
-                        {[
-                            { label: 'À-NOUVEAU', val: totalAnouveauPage, color: '#64748b' },
-                            { label: 'COTIS. ANNÉE', val: totalCotisationPage, color: '#64748b' },
-                            { label: 'AUTRES APPELS', val: totalAutrePage, color: '#64748b' },
-                            { label: 'TOTAL GÉNÉRAL', val: totalGeneral, color: '#2563EB' }
-                        ].map((item, index) => (
-                            <Box key={index} sx={{ textAlign: 'right', minWidth: '120px' }}>
-                                <Typography 
-                                    variant="caption" 
-                                    sx={{ 
-                                        fontWeight: 800, 
-                                        color: '#94a3b8', 
-                                        display: 'block', 
-                                        letterSpacing: '0.5px',
-                                        fontSize: '0.7rem'
-                                    }}
-                                >
-                                    {item.label}
-                                </Typography>
-                                <Typography 
-                                    variant="body1" 
-                                    sx={{ 
-                                        fontWeight: 900, 
-                                        fontSize: '1.15rem', 
-                                        color: item.color,
-                                        lineHeight: 1.2
-                                    }}
-                                >
-                                    {fNum(item.val)}
-                                    <span style={{ fontSize: '0.7rem', marginLeft: '4px', fontWeight: 600 }}>Ar</span>
-                                </Typography>
-                            </Box>
-                        ))}
-                    </Stack>
-                </Box>
-                   
-                <Box sx={{flex:1}}></Box>
-                    
-                <Button 
-                    variant="contained" 
-                    startIcon={<AddCardIcon />}
-                    onClick={() => { setForm({ ...initialForm, exerciceId: selectedEx }); setOpenModal(true); }}
-                    sx={{bgcolor: '#1b4332', '&:hover': { bgcolor: '#143225' }, textTransform: 'none', borderRadius: '6px' }}
-                >
-                    Enregistrer un règlement
-                </Button>
-                
-                {showComponent && 
-                    <Button 
-                    disabled={!showComponent}
-                        startIcon={<EmailIcon />} 
-                        onClick={() => handleOpenEmail()}
-                        variant="outlined"
-                        sx={{ ml: 1 }}
-                    >
-                        Email groupé
-                    </Button>
-                }
-
-                <Button 
-                    size="small" 
-                    variant="outlined" 
-                    startIcon={<SaveIcon />}
-                    onClick={handleExportExcel}
-                    sx={{height:37, color: '#1d6f42', borderColor: '#1d6f42', fontWeight: 700, borderRadius: '10px', textTransform: 'none' }}
-                    >
-                    Télécharger Excel
-                </Button>
-        
-                <PDFDownloadLink 
-                    document={<MyPdfDocument 
-                                data={rows} 
-                                exerciceLabel={getFullExerciceLabel()}
-                                />} 
-                    fileName={`Export_${'paiements'}.pdf`}
-                    style={{ textDecoration: 'none' }}
-                    >
-                    {({ loading }) => (
-                        <Button 
-                        size="small" 
-                        variant="outlined" 
-                        disabled={loading}
-                        startIcon={loading ? <CircularProgress size={20} /> : <LocalPrintshopOutlined />} 
-                        sx={{height:35, color: '#b91c1c', borderColor: '#b91c1c', fontWeight: 700, borderRadius: '10px', textTransform: 'none' }}
-                        >
-                        {loading ? 'Génération...' : 'Télécharger PDF'}
-                        </Button>
-                    )}
-                </PDFDownloadLink>
-            </Stack>
-        </Box>
-
-        {/* TABLEAU DATAGRID */}
-        <Box sx={{ 
-            height: 700, // Augmenté pour éviter le scroll vertical interne au Paper
-            width: '100%', 
-            bgcolor: '#fff', 
-            borderRadius: '12px', 
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            border: '1px solid #e2e8f0',
-            overflow: 'hidden', // On garde hidden ici pour le border-radius
-        }}>
-            <DataGrid
-                rowHeight={38}
-                rows={rows}
-                columns={columns}
-                // ... tes autres props
-                sx={{
-                    border: 'none',
-                    '& .MuiDataGrid-columnHeaders': { bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
-                    '& .font-bold-green': { color: '#1b4332', fontWeight: 'bold' },
-                    // Force l'affichage de la barre de défilement si nécessaire
-                    '& .MuiDataGrid-mainX': { overflow: 'auto' }, 
-                }}
-            />
-        </Box>
-
-        {/* MODAL PAIEMENT */}
-        <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: '12px' } }}>
-            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 3 }}>
-                <Box>
-                <Typography variant="h6" sx={{ fontWeight: 800 }}>NOUVEAU RÈGLEMENT</Typography>
-                <Typography variant="caption" sx={{ color: '#64748b' }}>Saisissez les détails du paiement reçu</Typography>
-                </Box>
-                <IconButton onClick={() => setOpenModal(false)}><CloseIcon /></IconButton>
-            </DialogTitle>
-
-            <DialogContent>
-                <Stack spacing={2} sx={{ mt: 0 }}>
-                
-                {/* DATE ET EXERCICE */}
-                <Grid container spacing={2} >
-                    <Grid item xs={7} sx={{ml:-2}}>
-                        <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block', color: '#475569' }}>DATE DU PAIEMENT</Typography>
-                        <TextField type="date" fullWidth size="small" sx={{width:180}}
-                            value={form.date} onChange={(e) => setForm({...form, date: e.target.value})} />
-                    </Grid>
-
-                    <Grid item xs={6} sx={{ml:-2}}>
-                        <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block', color: '#475569' }}>EXERCICE</Typography>
-                        
-                        <TextField 
-                            disabled={true}
-                            select 
-                            fullWidth 
-                            size="small" 
-                            value={form.exerciceId} 
-                            onChange={(e) => setForm({...form, exerciceId: e.target.value})} 
-                            sx={{width:400, bgcolor: 'white', '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e2e8f0' } }}
-                            >
-                            {exercices.map((ex) => (
-                                /* Utilise ex.id pour la key et la value */
+            {/* HEADER & FILTRE EXERCICE */}
+            <Box sx={{ mb: 3 }}>
+                <MyBreadcrumbs currentPath="paiement" />
+                <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a' }}>Paiements</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Gestion des paiements de cotisation</Typography>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 3 }} spacing={1}>
+                    <Box sx={{ maxWidth: 400 }}>
+                        <InputLabel sx={{ mb: 1, fontWeight: 700, fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Exercice de référence</InputLabel>
+                        <TextField select fullWidth size="small" value={selectedEx} onChange={(e) => setSelectedEx(e.target.value)} sx={{ bgcolor: 'white', '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e2e8f0' } }}>
+                            {exercices.map(ex => (
                                 <MenuItem key={ex.id} value={ex.id}>
-                                {ex.libelle} : {new Date(ex.date_debut).toLocaleDateString('fr-FR')} - {new Date(ex.date_fin).toLocaleDateString('fr-FR')}
+                                    {ex.libelle} : {new Date(ex.date_debut).toLocaleDateString('fr-FR')} - {new Date(ex.date_fin).toLocaleDateString('fr-FR')}
                                 </MenuItem>
                             ))}
                         </TextField>
-                    </Grid>
-                </Grid>
+                    </Box>
 
-                {/* MEMBRE */}
-                <Box>
-                    <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block', color: '#475569' }}>NOM ET PRÉNOM (S)</Typography>
-                    <Autocomplete
-                    options={membres}
-                    getOptionLabel={(o) => `${o.nom} ${o.prenom}`}
-                    value={membres.find(m => m.id === form.membreId) || null}
-                    onChange={(e, nv) => setForm({...form, membreId: nv ? nv.id : null})}
-                    renderInput={(params) => <TextField {...params} size="small" placeholder="Rechercher..." />}
-                    />
-                </Box>
+                    <Box sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-end',
+                        mb: 3,
+                        p: 2,
+                        bgcolor: '#ffffff',
+                        borderRadius: '8px',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)'
+                    }}>
+                        {/* DROITE : Les 4 Totaux */}
+                        <Stack direction="row" spacing={4} sx={{ mb: 0.5 }}>
+                            {[
+                                { label: 'À-NOUVEAU', val: totalAnouveauPage, color: '#64748b' },
+                                { label: 'COTIS. ANNÉE', val: totalCotisationPage, color: '#64748b' },
+                                { label: 'AUTRES APPELS', val: totalAutrePage, color: '#64748b' },
+                                { label: 'TOTAL GÉNÉRAL', val: totalGeneral, color: '#2563EB' }
+                            ].map((item, index) => (
+                                <Box key={index} sx={{ textAlign: 'right', minWidth: '120px' }}>
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            fontWeight: 800,
+                                            color: '#94a3b8',
+                                            display: 'block',
+                                            letterSpacing: '0.5px',
+                                            fontSize: '0.7rem'
+                                        }}
+                                    >
+                                        {item.label}
+                                    </Typography>
+                                    <Typography
+                                        variant="body1"
+                                        sx={{
+                                            fontWeight: 900,
+                                            fontSize: '1.15rem',
+                                            color: item.color,
+                                            lineHeight: 1.2
+                                        }}
+                                    >
+                                        {fNum(item.val)}
+                                        <span style={{ fontSize: '0.7rem', marginLeft: '4px', fontWeight: 600 }}>Ar</span>
+                                    </Typography>
+                                </Box>
+                            ))}
+                        </Stack>
+                    </Box>
 
-                {/* ZONE FINANCIÈRE */}
-                <Box sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                    <Grid container sx={{ mb: 1, px: 1 }}>
-                    <Grid item xs={6}><Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b' }}>LIBELLÉ</Typography></Grid>
-                    <Grid item xs={3} align="right"><Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b' }}>DÛ</Typography></Grid>
-                    <Grid item xs={3} align="right"><Typography variant="caption" sx={{ fontWeight: 700, color: '#1b4332' }}>VERSÉ</Typography></Grid>
-                    </Grid>
-                    
-                    {[
-                    { label: 'A-NOUVEAU', s: 'sitAnouveau', p: 'payeAnouveau' },
-                    { label: 'COTISATION DE L\'ANNÉE', s: 'sitCotisation', p: 'payeCotisation' },
-                    { label: 'AUTRES APPELS', s: 'sitAutre', p: 'payeAutre' }
-                    ].map((item) => (
-                    <Grid container spacing={1} key={item.label} alignItems="center" sx={{ mb: 1.5, px: 1 }}>
-                        <Grid item xs={6}><Typography variant="body2" sx={{ fontSize: '0.85rem' }}>{item.label}</Typography></Grid>
-                        <Grid item xs={3} align="right">
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {new Intl.NumberFormat('fr-FR').format(form[item.s])} Ar
-                        </Typography>
-                        </Grid>
-                        <Grid item xs={3}>
-                        <NumericFormat
-                            customInput={TextField}
-                            variant="standard"
-                            fullWidth
-                            thousandSeparator=" "
-                            suffix=" Ar"
-                            value={form[item.p]}
-                            onValueChange={(values) => setForm({ ...form, [item.p]: values.floatValue || 0 })}
-                            inputProps={{ style: { textAlign: 'right', fontWeight: 800, color: '#1b4332' } }}
-                        />
-                        </Grid>
-                    </Grid>
-                    ))}
+                    <Box sx={{ flex: 1 }}></Box>
 
-                    <Divider sx={{ my: 1 }} />
+                    <Button
+                        variant="contained"
+                        startIcon={<AddCardIcon />}
+                        onClick={() => { setForm({ ...initialForm, exerciceId: selectedEx }); setOpenModal(true); }}
+                        sx={{ bgcolor: '#1b4332', '&:hover': { bgcolor: '#143225' }, textTransform: 'none', borderRadius: '6px' }}
+                    >
+                        Enregistrer un règlement
+                    </Button>
 
-                    <Grid container sx={{ px: 1 }}>
-                    <Grid item xs={6}><Typography variant="subtitle2" sx={{ fontWeight: 800 }}>TOTAL</Typography></Grid>
-                    <Grid item xs={3} align="right"><Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{new Intl.NumberFormat('fr-FR').format(totalSit)} Ar</Typography></Grid>
-                    <Grid item xs={3} align="right"><Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1b4332' }}>{new Intl.NumberFormat('fr-FR').format(totalPaye)} Ar</Typography></Grid>
-                    </Grid>
-                </Box>
+                    {showComponent &&
+                        <Button
+                            disabled={!showComponent}
+                            startIcon={<EmailIcon />}
+                            onClick={() => handleOpenEmail()}
+                            variant="outlined"
+                            sx={{ ml: 1 }}
+                        >
+                            Email groupé
+                        </Button>
+                    }
 
-                {/* MODE DE RÈGLEMENT */}
-                <Box>
-                    <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block', color: '#475569' }}>MODE DE RÈGLEMENT</Typography>
-                    <TextField select fullWidth size="small" value={form.mode} onChange={(e) => setForm({...form, mode: e.target.value})}>
-                    <MenuItem value="Espèce">ESPÈCE</MenuItem>
-                    <MenuItem value="Virement">VIREMENT</MenuItem>
-                    <MenuItem value="Chèque">CHÈQUE</MenuItem>
-                    <MenuItem value="M-Vola">MOBILE MONEY</MenuItem>
-                    </TextField>
-                </Box>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<SaveIcon />}
+                        onClick={handleExportExcel}
+                        sx={{ height: 37, color: '#1d6f42', borderColor: '#1d6f42', fontWeight: 700, borderRadius: '10px', textTransform: 'none' }}
+                    >
+                        Télécharger Excel
+                    </Button>
 
-                {/* DÉTAILS PAIEMENT (PLEINE LARGEUR) */}
-                <Box>
-                    <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block', color: '#475569' }}>DÉTAILS PAIEMENT / RÉFÉRENCE</Typography>
-                    <TextField 
-                    fullWidth 
-                    size="small" 
-                    placeholder="Renseigner les détails du paiement ici" 
-                    value={form.reference} 
-                    onChange={(e) => setForm({...form, reference: e.target.value})} 
-                    />
-                </Box>
+                    <Button
+                        onClick={() => handlePrintPaiementTable(rows, getFullExerciceLabel())}
+                        size="small"
+                        variant="outlined"
+                        startIcon={loading ? <CircularProgress size={16} /> : <LocalPrintshopOutlined />}
+                        sx={{ height: 35, color: '#b91c1c', borderColor: '#b91c1c', fontWeight: 700, borderRadius: '10px', textTransform: 'none' }}
+                    >
+                        Télécharger PDF
+                    </Button>
 
                 </Stack>
-            </DialogContent>
+            </Box>
 
-            <DialogActions sx={{ p: 3, borderTop: '1px solid #f1f5f9' }}>
-                <Button onClick={() => setOpenModal(false)} startIcon={<CancelIcon />} sx={{ color: '#64748b', textTransform: 'none' }}>ANNULER</Button>
-                <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave}
-                sx={{ bgcolor: '#1b4332', '&:hover': { bgcolor: '#143225' }, textTransform: 'none', px: 4, borderRadius: '6px' }}>
-                ENREGISTRER
-                </Button>
-            </DialogActions>
-        </Dialog>
+            {/* TABLEAU DATAGRID */}
+            <Box sx={{
+                height: 550, // Augmenté pour éviter le scroll vertical interne au Paper
+                width: '100%',
+                bgcolor: '#fff',
+                borderRadius: '12px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                border: '1px solid #e2e8f0',
+                overflow: 'hidden', // On garde hidden ici pour le border-radius
+            }}>
+                <DataGrid
+                    rowHeight={38}
+                    rows={rows}
+                    columns={columns}
+                    // ... tes autres props
+                    slots={{ toolbar: GridToolbar, footer: CustomFooter }}
+                    slotProps={{
+                        toolbar: {
+                            showQuickFilter: true, // Affiche le champ de recherche
+                            quickFilterProps: { debounceMs: 500 }, // Optionnel : attend 500ms avant de filtrer
+                        },
+                    }}
+                    sx={{
+                        border: 'none',
+                        '& .MuiDataGrid-columnHeaders': { bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
+                        '& .font-bold-green': { color: '#1b4332', fontWeight: 'bold' },
+                        // Force l'affichage de la barre de défilement si nécessaire
+                        '& .MuiDataGrid-mainX': { overflow: 'auto' },
+                    }}
+                />
+            </Box>
 
-        {/* POPUP D'ENVOI DE MAIL */}
-        <SendEmailModal 
-            open={emailModalOpen}
-            handleClose={() => setEmailModalOpen(false)}
-            membres={rows}
-            initialMember={currentMember}
-            onSend={() => handleSendMail('all')}
-        />
-
-        {/* --- Fenêtre de confirmation individuelle --- */}
-        <ConfirmSingleModal 
-            open={singleModalOpen} 
-            handleClose={() => setSingleModalOpen(false)} 
-            onConfirm={handleConfirmSingle} 
-            loading={isSending} // Si tu as un état de chargement, sinon mets false
-            name={selectedRow ? `${selectedRow.nom} ${selectedRow.prenom}` : ""} 
-        />
-
-        {/* POPUP HISTORIQUE D'ENVOI EMAIL */}
-        <Dialog 
-            open={historyModalOpen} 
-            onClose={() => setHistoryModalOpen(false)}
-            maxWidth="sm"
-            fullWidth
-            PaperProps={{ sx: { borderRadius: '8px' } }}
-        >
-            <DialogTitle sx={{ bgcolor: '#0F172A', color: 'white', py: 1.5 }}>
-                <Typography variant="subtitle1" fontWeight="600">
-                    Historique des envois : {historyTarget}
-                </Typography>
-            </DialogTitle>
-            <DialogContent sx={{ p: 0 }}>
-                {selectedHistory.length > 0 ? (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                        <thead>
-                            <tr style={{ backgroundColor: '#F8FAFC', textAlign: 'left', borderBottom: '1px solid #E2E8F0' }}>
-                                <th style={{ padding: '12px' }}>Date & Heure</th>
-                                <th style={{ padding: '12px' }}>Destinataire</th>
-                                <th style={{ padding: '12px' }}>Statut</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {selectedHistory.map((log, index) => (
-                                <tr key={index} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                                    <td style={{ padding: '10px 12px' }}>
-                                        {new Date(log.date_envoi).toLocaleString('fr-FR')}
-                                    </td>
-                                    <td style={{ padding: '10px 12px' }}>{log.email_dest}</td>
-                                    <td style={{ padding: '10px 12px' }}>
-                                        <Chip 
-                                            label={log.statut} 
-                                            size="small" 
-                                            sx={{ 
-                                                height: '20px', fontSize: '0.7rem',
-                                                bgcolor: log.statut === 'Succès' ? '#DCFCE7' : '#FEE2E2',
-                                                color: log.statut === 'Succès' ? '#166534' : '#991B1B'
-                                            }} 
-                                        />
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                ) : (
-                    <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
-                        <Typography variant="body2">Aucun mail envoyé pour ce règlement.</Typography>
+            {/* MODAL PAIEMENT */}
+            <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: '12px' } }}>
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 3 }}>
+                    <Box>
+                        <Typography variant="h6" sx={{ fontWeight: 800 }}>NOUVEAU RÈGLEMENT</Typography>
+                        <Typography variant="caption" sx={{ color: '#64748b' }}>Saisissez les détails du paiement reçu</Typography>
                     </Box>
-                )}
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={() => setHistoryModalOpen(false)} sx={{ textTransform: 'none', color: '#64748B' }}>
-                    Fermer
-                </Button>
-            </DialogActions>
-        </Dialog>
+                    <IconButton onClick={() => setOpenModal(false)}><CloseIcon /></IconButton>
+                </DialogTitle>
 
-        <ConfirmationDialog />
-    </Box>
+                <DialogContent>
+                    <Stack spacing={2} sx={{ mt: 0 }}>
+
+                        {/* DATE ET EXERCICE */}
+                        <Grid container spacing={2} >
+                            <Grid item xs={7} sx={{ ml: -2 }}>
+                                <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block', color: '#475569' }}>DATE DU PAIEMENT</Typography>
+                                <TextField type="date" fullWidth size="small" sx={{ width: 180 }}
+                                    value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                            </Grid>
+
+                            <Grid item xs={6} sx={{ ml: -2 }}>
+                                <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block', color: '#475569' }}>EXERCICE</Typography>
+
+                                <TextField
+                                    disabled={true}
+                                    select
+                                    fullWidth
+                                    size="small"
+                                    value={form.exerciceId}
+                                    onChange={(e) => setForm({ ...form, exerciceId: e.target.value })}
+                                    sx={{ width: 400, bgcolor: 'white', '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e2e8f0' } }}
+                                >
+                                    {exercices.map((ex) => (
+                                        /* Utilise ex.id pour la key et la value */
+                                        <MenuItem key={ex.id} value={ex.id}>
+                                            {ex.libelle} : {new Date(ex.date_debut).toLocaleDateString('fr-FR')} - {new Date(ex.date_fin).toLocaleDateString('fr-FR')}
+                                        </MenuItem>
+                                    ))}
+                                </TextField>
+                            </Grid>
+                        </Grid>
+
+                        {/* MEMBRE */}
+                        <Box>
+                            <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block', color: '#475569' }}>NOM ET PRÉNOM (S)</Typography>
+                            <Autocomplete
+                                options={membres}
+                                getOptionLabel={(o) => `${o.nom} ${o.prenom}`}
+                                value={membres.find(m => m.id === form.membreId) || null}
+                                onChange={(e, nv) => setForm({ ...form, membreId: nv ? nv.id : null })}
+                                renderInput={(params) => <TextField {...params} size="small" placeholder="Rechercher..." />}
+                            />
+                        </Box>
+
+                        {/* ZONE FINANCIÈRE */}
+                        <Box sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                            <Grid container sx={{ mb: 1, px: 1 }}>
+                                <Grid item xs={6}><Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b' }}>LIBELLÉ</Typography></Grid>
+                                <Grid item xs={3} align="right"><Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b' }}>DÛ</Typography></Grid>
+                                <Grid item xs={3} align="right"><Typography variant="caption" sx={{ fontWeight: 700, color: '#1b4332' }}>VERSÉ</Typography></Grid>
+                            </Grid>
+
+                            {[
+                                { label: 'A-NOUVEAU', s: 'sitAnouveau', p: 'payeAnouveau' },
+                                { label: 'COTISATION DE L\'ANNÉE', s: 'sitCotisation', p: 'payeCotisation' },
+                                { label: 'AUTRES APPELS', s: 'sitAutre', p: 'payeAutre' }
+                            ].map((item) => (
+                                <Grid container spacing={1} key={item.label} alignItems="center" sx={{ mb: 1.5, px: 1 }}>
+                                    <Grid item xs={6}><Typography variant="body2" sx={{ fontSize: '0.85rem' }}>{item.label}</Typography></Grid>
+                                    <Grid item xs={3} align="right">
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                            {new Intl.NumberFormat('fr-FR').format(form[item.s])} Ar
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={3}>
+                                        <NumericFormat
+                                            customInput={TextField}
+                                            variant="standard"
+                                            fullWidth
+                                            thousandSeparator=" "
+                                            suffix=" Ar"
+                                            value={form[item.p]}
+                                            onValueChange={(values) => setForm({ ...form, [item.p]: values.floatValue || 0 })}
+                                            inputProps={{ style: { textAlign: 'right', fontWeight: 800, color: '#1b4332' } }}
+                                        />
+                                    </Grid>
+                                </Grid>
+                            ))}
+
+                            <Divider sx={{ my: 1 }} />
+
+                            <Grid container sx={{ px: 1 }}>
+                                <Grid item xs={6}><Typography variant="subtitle2" sx={{ fontWeight: 800 }}>TOTAL</Typography></Grid>
+                                <Grid item xs={3} align="right"><Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{new Intl.NumberFormat('fr-FR').format(totalSit)} Ar</Typography></Grid>
+                                <Grid item xs={3} align="right"><Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#1b4332' }}>{new Intl.NumberFormat('fr-FR').format(totalPaye)} Ar</Typography></Grid>
+                            </Grid>
+                        </Box>
+
+                        {/* MODE DE RÈGLEMENT */}
+                        <Box>
+                            <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block', color: '#475569' }}>MODE DE RÈGLEMENT</Typography>
+                            <TextField select fullWidth size="small" value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}>
+                                <MenuItem value="Espèce">ESPÈCE</MenuItem>
+                                <MenuItem value="Virement">VIREMENT</MenuItem>
+                                <MenuItem value="Chèque">CHÈQUE</MenuItem>
+                                <MenuItem value="M-Vola">MOBILE MONEY</MenuItem>
+                            </TextField>
+                        </Box>
+
+                        {/* DÉTAILS PAIEMENT (PLEINE LARGEUR) */}
+                        <Box>
+                            <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block', color: '#475569' }}>DÉTAILS PAIEMENT / RÉFÉRENCE</Typography>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                placeholder="Renseigner les détails du paiement ici"
+                                value={form.reference}
+                                onChange={(e) => setForm({ ...form, reference: e.target.value })}
+                            />
+                        </Box>
+
+                    </Stack>
+                </DialogContent>
+
+                <DialogActions sx={{ p: 3, borderTop: '1px solid #f1f5f9' }}>
+                    <Button onClick={() => setOpenModal(false)} startIcon={<CancelIcon />} sx={{ color: '#64748b', textTransform: 'none' }}>ANNULER</Button>
+                    <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSave}
+                        sx={{ bgcolor: '#1b4332', '&:hover': { bgcolor: '#143225' }, textTransform: 'none', px: 4, borderRadius: '6px' }}>
+                        ENREGISTRER
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* POPUP D'ENVOI DE MAIL */}
+            <SendEmailModal
+                open={emailModalOpen}
+                handleClose={() => setEmailModalOpen(false)}
+                membres={rows}
+                initialMember={currentMember}
+                onSend={() => handleSendMail('all')}
+            />
+
+            {/* --- Fenêtre de confirmation individuelle --- */}
+            <ConfirmSingleModal
+                open={singleModalOpen}
+                handleClose={() => setSingleModalOpen(false)}
+                onConfirm={handleConfirmSingle}
+                loading={isSending} // Si tu as un état de chargement, sinon mets false
+                name={selectedRow ? `${selectedRow.nom} ${selectedRow.prenom}` : ""}
+            />
+
+            {/* POPUP HISTORIQUE D'ENVOI EMAIL */}
+            <Dialog
+                open={historyModalOpen}
+                onClose={() => setHistoryModalOpen(false)}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{ sx: { borderRadius: '8px' } }}
+            >
+                <DialogTitle sx={{ bgcolor: '#0F172A', color: 'white', py: 1.5 }}>
+                    <Typography variant="subtitle1" fontWeight="600">
+                        Historique des envois : {historyTarget}
+                    </Typography>
+                </DialogTitle>
+                <DialogContent sx={{ p: 0 }}>
+                    {selectedHistory.length > 0 ? (
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                            <thead>
+                                <tr style={{ backgroundColor: '#F8FAFC', textAlign: 'left', borderBottom: '1px solid #E2E8F0' }}>
+                                    <th style={{ padding: '12px' }}>Date & Heure</th>
+                                    <th style={{ padding: '12px' }}>Destinataire</th>
+                                    <th style={{ padding: '12px' }}>Statut</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {selectedHistory.map((log, index) => (
+                                    <tr key={index} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                                        <td style={{ padding: '10px 12px' }}>
+                                            {new Date(log.date_envoi).toLocaleString('fr-FR')}
+                                        </td>
+                                        <td style={{ padding: '10px 12px' }}>{log.email_dest}</td>
+                                        <td style={{ padding: '10px 12px' }}>
+                                            <Chip
+                                                label={log.statut}
+                                                size="small"
+                                                sx={{
+                                                    height: '20px', fontSize: '0.7rem',
+                                                    bgcolor: log.statut === 'Succès' ? '#DCFCE7' : '#FEE2E2',
+                                                    color: log.statut === 'Succès' ? '#166534' : '#991B1B'
+                                                }}
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>
+                            <Typography variant="body2">Aucun mail envoyé pour ce règlement.</Typography>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setHistoryModalOpen(false)} sx={{ textTransform: 'none', color: '#64748B' }}>
+                        Fermer
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <ConfirmationDialog />
+        </Box>
     );
 };
 

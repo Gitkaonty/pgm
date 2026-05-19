@@ -3,7 +3,8 @@ import {
     Box, Typography, TextField, InputAdornment, Card, Stack,
     Avatar, Chip, LinearProgress, Grid, IconButton, Tooltip,
     Breadcrumbs, Link, Button, Dialog, DialogTitle, DialogContent,
-    DialogActions, Autocomplete
+    DialogActions, Autocomplete,
+    CircularProgress
 } from '@mui/material';
 import {
     Search, FilterList, CheckCircle, MoreVert,
@@ -16,6 +17,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { Tabs, Tab } from '@mui/material';
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, Image } from '@react-pdf/renderer';
 import PdfAttestationExpA from './pdf_attestation';
+import { pdf } from '@react-pdf/renderer';
 
 const GREEN_MAIN = '#435844';
 const GREEN_ACCENT = '#8BC34A';
@@ -58,7 +60,7 @@ const ConfirmValidationModal = ({ open, onClose, onConfirm, step, name }) => {
                     {isRejet ? (
                         <>Voulez-vous rejeter la demande de <strong>{name}</strong> ? Cette action annulera les validations précédentes.</>
                     ) : (
-                        <>Voulez-vous approuver la demande de <strong>{name}</strong> pour l'étape <strong>{step === 1 ? 'Secrétariat' : 'Présidence'}</strong> ?</>
+                        <>Voulez-vous approuver la demande de <strong>{name}</strong> pour l'étape <strong>{step === 1 ? 'Secrétariat' : step === 2 ?'Présidence': 'SG'}</strong> ?</>
                     )}
                 </Typography>
             </DialogContent>
@@ -78,6 +80,7 @@ const ConfirmValidationModal = ({ open, onClose, onConfirm, step, name }) => {
                         textTransform: 'none'
                     }}
                 >
+                    
                     {isRejet ? 'Oui, rejeter' : 'Oui, approuver'}
                 </Button>
             </DialogActions>
@@ -157,6 +160,8 @@ const DemandeAttestationModal = ({ open, onClose, membres, exercices, onRefresh 
 // --- CARTE D'ATTESTATION ---
 const AttestationCard = ({ data, onRefresh, onValidateRequest, orderInfo, president,secretaireGen }) => {
     const [openDelete, setOpenDelete] = useState(false);
+    const [loading, setLoading] = useState(false);
+
     const axiosPrivate = useAxiosPrivate();
 
     const valCount = (data.validation_1 ? 1 : 0) + (data.validation_2 ? 1 : 0);
@@ -170,6 +175,28 @@ const AttestationCard = ({ data, onRefresh, onValidateRequest, orderInfo, presid
             setOpenDelete(false);
         } catch (err) {
             toast.error("Erreur suppression");
+        }
+    };
+
+    //imprimer l'attestation
+    const handlePrintAttestation = async (data, orderInfo) => {
+        try {
+            setLoading(true);
+            const doc = (
+                <PdfAttestationExpA 
+                rows={data} 
+                infoSignataire={orderInfo} 
+                />
+            );
+
+            // 3. On crée un Blob et on l'ouvre dans un nouvel onglet
+            const blob = await pdf(doc).toBlob();
+            const url = window.URL.createObjectURL(blob);
+            window.open(url, '_blank');
+            setLoading(false);
+        } catch (error) {
+            console.error("Erreur impression:", error);
+            toast.error("Impossible de générer le PDF");
         }
     };
 
@@ -285,14 +312,18 @@ const AttestationCard = ({ data, onRefresh, onValidateRequest, orderInfo, presid
                 </Box>
 
                 <Stack direction="row" spacing={1} sx={{ ml: 2 }}>
-                    {!data.validation_1 && secretaireGen && (
+                    {!data.rejeter && !data.validation_0 && !data.validation_1 && !data.validation_2 && !secretaireGen && !president && (
+                        <Button variant="contained" size="small" onClick={() => onValidateRequest(data, 3)} sx={{ bgcolor: GREEN_ACCENT, textTransform: 'none' }}>Valider V0</Button>
+                    )}
+                    {!data.rejeter && data.validation_0 && !data.validation_1 && secretaireGen && (
                         <Button variant="contained" size="small" onClick={() => onValidateRequest(data, 1)} sx={{ bgcolor: GREEN_ACCENT, textTransform: 'none' }}>Valider V1</Button>
                     )}
-                    {data.validation_1 && !data.validation_2 && president && (
+                    {!data.rejeter && data.validation_0 && data.validation_1 && !data.validation_2 && president && (
                         <Button variant="contained" size="small" onClick={() => onValidateRequest(data, 2)} sx={{ bgcolor: GREEN_MAIN, textTransform: 'none' }}>Valider V2</Button>
                     )}
 
-                    {progress < 100 && (secretaireGen || president) && (
+                    {/* && (secretaireGen || president) : enlever car les admin peuvent maintenant rejeter des demandes*/}
+                    {progress < 100  && (
                         <Button
                             variant="outlined"
                             color="error"
@@ -308,27 +339,18 @@ const AttestationCard = ({ data, onRefresh, onValidateRequest, orderInfo, presid
                         {/* <IconButton sx={{ border: '1px solid #e0e4e7', color: GREEN_MAIN }}><PrintOutlined fontSize="small" /></IconButton> */}
                     {/* )} */}
 
-                    <PDFDownloadLink
-                        document={<PdfAttestationExpA
-                            rows={data}
-                            infoSignataire={orderInfo}
-                        />}
-                        fileName={`Export_Attestation.pdf`}
-                        style={{ textDecoration: 'none' }}
+                    <IconButton
+                        onClick={() => handlePrintAttestation(data, orderInfo)}
+                        sx={{
+                            bgcolor: progress === 100 ? '#f5f5f5' : 'transparent',
+                            color: progress === 100 ? GREEN_MAIN : '#bdbdbd',
+                            border: '1px solid #e0e4e7',
+                            borderRadius: 2
+                        }}
                     >
-                        <IconButton
-                            
-                            sx={{
-                                bgcolor: progress === 100 ? '#f5f5f5' : 'transparent',
-                                color: progress === 100 ? GREEN_MAIN : '#bdbdbd',
-                                border: '1px solid #e0e4e7',
-                                borderRadius: 2
-                            }}
-                        >
-                            <PrintOutlined fontSize="small" />
-                        </IconButton>
+                        {loading ? <CircularProgress size={16} /> : <PrintOutlined fontSize="small" />}
+                    </IconButton>
 
-                    </PDFDownloadLink>
 
                     <IconButton onClick={() => setOpenDelete(true)} disabled={valCount > 0} color="error"><DeleteOutline fontSize="small" /></IconButton>
 

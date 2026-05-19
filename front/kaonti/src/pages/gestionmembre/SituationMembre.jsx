@@ -5,7 +5,7 @@ import {
   InputLabel, Avatar, Drawer, IconButton, Divider, Grid,
   Tooltip
 } from '@mui/material';
-import { DataGrid } from '@mui/x-data-grid';
+import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import {
   SearchOutlined, NavigateNext, HomeOutlined,
   VisibilityOutlined, CloseOutlined, ContactPhoneOutlined,
@@ -195,8 +195,8 @@ const SituationMembre = () => {
     // }},
     { field: 'situation', headerName: 'Situation', width: 130, renderCell: (p) => renderBadge(p, { 'En activité': '#1976d2', 'Inactive': '#ed6c02', 'Suspendu': '#d32f2f' }) },
     { field: 'section', headerName: 'Section', width: 150, renderCell: (p) => renderBadge(p, { 'Expert Comptable': '#9c27b0', 'Société Expert': '#00838f' }) },
-    { field: 'statut', headerName: 'Statut', width: 150, renderCell: (p) => renderBadge(p, { 'Expert Comptable': '#0288d1', 'Expert Stagiaire': '#455a64' }) },
-    { field: 'titre', headerName: 'Titre', width: 120, renderCell: (p) => renderBadge(p, { 'Tableau A': '#2e7d32', 'Tableau B': '#689f38' }) },
+    { field: 'statut', headerName: 'Niveau', width: 150, renderCell: (p) => renderBadge(p, { 'Expert Comptable': '#0288d1', 'Expert Stagiaire': '#455a64' }) },
+    { field: 'titre', headerName: 'Titre', width: 120, renderCell: (p) => renderBadge(p, { 'Tableau A': '#2e7d32', 'Tableau B': '#5c5ade', 'Stagiaire': '#ed6c02' }) },
 
 
     // { field: 'section', headerName: 'Section', width: 150 },
@@ -204,6 +204,7 @@ const SituationMembre = () => {
     // { field: 'titre', headerName: 'Titre', width: 120 },
     { field: 'promotion', headerName: 'Promotion', width: 100 },
     { field: 'date_adhesion', headerName: 'Date adhésion', width: 110, valueFormatter: (p) => p.value ? new Date(p.value).toLocaleDateString('fr-FR') : '' },
+    { field: 'diplome', headerName: 'Diplôme', width: 200 },
     { field: 'sexe', headerName: 'Sexe', width: 80 },
     { field: 'poste', headerName: 'Poste', width: 180 },
     { field: 'email_oecfm', headerName: 'Email OECFM', width: 180 },
@@ -234,11 +235,11 @@ const SituationMembre = () => {
   return (
     <Box sx={{ p: 0, bgcolor: '#f8fafc', minHeight: '100vh' }}>
       <Toaster position="top-right" />
-      <MyBreadcrumbs currentPath="Situation Membre" />
+      <MyBreadcrumbs currentPath="Liste membre" />
 
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Typography variant="h5" sx={{ fontWeight: 800, color: '#1b4332', letterSpacing: -0.5 }}>
-          Situation des Membres
+          Liste des Membres
         </Typography>
         <Button
           variant="outlined"
@@ -307,6 +308,13 @@ const SituationMembre = () => {
         <DataGrid
           rows={rows} columns={columns} loading={loading} rowHeight={52} disableRowSelectionOnClick
           initialState={{ pinnedColumns: { left: ['actions', 'photo_url', 'matricule', 'nom', 'prenom'] } }}
+          slots={{ toolbar: GridToolbar }} 
+          slotProps={{
+              toolbar: {
+                  showQuickFilter: true, // Affiche le champ de recherche
+                  quickFilterProps: { debounceMs: 500 }, // Optionnel : attend 500ms avant de filtrer
+              },
+          }}
           sx={{ border: 'none', '& .MuiDataGrid-columnHeaders': { bgcolor: '#f8fafb', color: '#475569', fontWeight: 800, fontSize: '0.75rem' } }}
         />
       </Paper>

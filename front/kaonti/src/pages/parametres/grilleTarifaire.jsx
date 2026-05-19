@@ -155,12 +155,12 @@ const GrilleTarifaire = () => {
   return (
     <Box sx={{ maxWidth: 14000, mx: 'auto', p: 0 }}>
       <Toaster position="top-right" />
-      <MyBreadcrumbs currentPath="Grille tarifaire" />
+      <MyBreadcrumbs currentPath="Grille cotisation" />
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
         <Box>
           <Stack direction="row" spacing={1} alignItems="center">
             <PaymentsOutlined sx={{ color: '#435844' }} />
-            <Typography variant="h5" sx={{ fontWeight: 800, color: '#1A2027' }}>Grille Tarifaire</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: '#1A2027' }}>Grille Cotisation</Typography>
           </Stack>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>Paramétrage des cotisations par exercice fiscal.</Typography>
         </Box>
@@ -180,7 +180,7 @@ const GrilleTarifaire = () => {
             variant="contained" startIcon={<AddOutlined />} onClick={handleAddRow}
             sx={{ bgcolor: '#435844', borderRadius: '8px', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#354736' } }}
           >
-            Nouveau tarif
+            Nouvelle grille
           </Button>
         </Stack>
       </Stack>
@@ -190,7 +190,7 @@ const GrilleTarifaire = () => {
           <TableHead sx={{ bgcolor: '#F8FAF9' }}>
             <TableRow>
               <TableCell sx={{ fontWeight: 700, color: '#455A64' }}>SECTION</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#455A64' }}>STATUT</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: '#455A64' }}>NIVEAU</TableCell>
               <TableCell sx={{ fontWeight: 700, color: '#455A64' }}>TITRE</TableCell>
               <TableCell sx={{ fontWeight: 700, color: '#455A64' }}>RÉGIME</TableCell>
               <TableCell sx={{ fontWeight: 700, color: '#455A64' }}>Associés MIN</TableCell>
@@ -227,6 +227,7 @@ const GrilleTarifaire = () => {
                       <Select size="small" value={t.titre} onChange={(e) => handleChange(t.id, 'titre', e.target.value)} fullWidth>
                         <MenuItem value="Tableau A">Tableau A</MenuItem>
                         <MenuItem value="Tableau B">Tableau B</MenuItem>
+                        <MenuItem value="Stagiaire">Stagiaire</MenuItem>
                       </Select>
                     ) : <Chip label={t.titre} size="small" sx={getTitreStyle(t.titre)} />}
                   </TableCell>

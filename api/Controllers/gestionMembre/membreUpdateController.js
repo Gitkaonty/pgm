@@ -14,7 +14,7 @@ exports.getAllUpdates = async (req, res) => {
                 CONCAT(mi.nom, ' ', mi.prenom) as membre_nom_complet
             FROM membres_updates mu
             LEFT JOIN membresidentites mi ON mu.membre_id = mi.id
-            ORDER BY mu.date_edition DESC
+            ORDER BY mi.nom ASC
         `;
         
         const [rows] = await db.sequelize.query(query);
@@ -46,9 +46,24 @@ exports.updateRow = async (req, res) => {
     const { id } = req.params;
     const data = req.body;
 
+    const row_Id = data.id;
+
+    delete data.id;
+    delete data.matricule;
+    delete data.nom;
+    delete data.prenom;
+    delete data.sexe;
+    delete data.cin;
+    delete data.date_naissance;
+    delete data.lieu_naissance;
+    delete data.date_cin;
+    delete data.lieu_cin;
+    delete data.date_adhesion;
+    delete data.promotion;
+
     // On force la mise à jour
     const [updated] = await MembreUpdate.update(data, {
-      where: { id: id }
+      where: { id: row_Id }
     });
 
     if (updated) {
@@ -57,7 +72,7 @@ exports.updateRow = async (req, res) => {
       return res.status(200).json(updatedRow);
     }
     
-    throw new Error('Ligne non trouvée');
+    //throw new Error('Ligne non trouvée');
   } catch (error) {
     console.error("ERREUR UPDATE BACKEND :", error.message);
     res.status(500).json({ message: error.message });
@@ -158,6 +173,7 @@ exports.importExcelUpdate = async (req, res) => {
                 section: cleanRow.section || null,
                 statut: cleanRow.statut || null,
                 titre: cleanRow.titre || null,
+                diplome: cleanRow.diplome || null,
                 email_oecfm: cleanRow.email_oecfm || null,
                 adresse: cleanRow.adresse || null,
                 ville: cleanRow.ville || null,
@@ -176,8 +192,6 @@ exports.importExcelUpdate = async (req, res) => {
 
         // 4. Insertion groupée
 
-        console.log(values);
-
         await MembreUpdate.bulkCreate(values, { timestamps: true });
 
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -188,4 +202,211 @@ exports.importExcelUpdate = async (req, res) => {
         console.error("Erreur Import Update:", error);
         res.status(500).json({ message: error.message || "Erreur lors de l'importation" });
     }
+};
+
+exports.getMembreLastUpdate = async (req, res) => {
+  try {
+    const { membre_id } = req.params;
+
+    const query = `
+    SELECT 
+        u.id, 
+        m.matricule, 
+        m.nom, 
+        m.prenom,
+        m.sexe,
+        m.cin,
+        m.date_naissance,
+        m.lieu_naissance,
+        m.date_cin,
+        m.lieu_cin,
+        m.date_adhesion,
+        m.promotion,
+        m.photo_url, -- Ajout de la photo depuis la table identité
+        u.date_edition,
+        u.diplome,
+        u.date_modification,
+        u.membre_active, 
+        u.situation, 
+        u.section, 
+        u.statut, 
+        u.titre,
+        u.email_oecfm,
+        u.adresse,
+        u.ville,
+        u.code_postal,
+        u.boite_postale,
+        u.telephone,
+        u.fax,
+        u.email_personnel,
+        u.email_professionnel,
+        u.poste,
+        u.region,
+        u.num_compte,
+        u.nombre_associe
+    FROM membresidentites m
+    LEFT JOIN membres_updates u ON u.id = (
+        SELECT id 
+        FROM membres_updates 
+        WHERE membre_id = m.id
+        ORDER BY date_modification DESC, id DESC
+        LIMIT 1
+    ) WHERE m.id = :membre_id
+    ORDER BY m.nom ASC
+    `;
+
+    const lastData = await db.sequelize.query(query, {
+        replacements: { membre_id: membre_id },
+        type: db.sequelize.QueryTypes.SELECT
+    });
+
+    res.json(lastData);
+  } catch (error) {
+    console.error("Erreur Situation Membre:", error);
+    res.status(500).json({ message: "Erreur lors de la récupération de la situation" });
+  }
+};
+
+exports.getHistoriqueMembre = async (req, res) => {
+  try {
+    const { membre_id } = req.params;
+
+    // On récupère toutes les lignes de la table membres_updates pour ce membre
+    // On trie par date la plus récente en premier
+    const historique = await db.membres_updates.findAll({
+      where: { 
+        membre_id: membre_id 
+      },
+      attributes: ['id', 'date_modification'], // On ne prend que ce qui est utile pour le menu
+      order: [['date_modification', 'DESC'], ['id', 'DESC']]
+    });
+
+    // On renvoie directement le tableau des dates
+    res.json(historique);
+
+  } catch (error) {
+    console.error("Erreur Historique Membre:", error);
+    res.status(500).json({ message: "Erreur lors de la récupération de l'historique" });
+  }
+};
+
+exports.getMembreByDateInfos = async (req, res) => {
+  try {
+    const { membre_id, date_modif } = req.params;
+
+    const query = `
+    SELECT 
+        u.id, 
+        m.matricule, 
+        m.nom, 
+        m.prenom,
+        m.sexe,
+        m.cin,
+        m.date_naissance,
+        m.lieu_naissance,
+        m.date_cin,
+        m.lieu_cin,
+        m.date_adhesion,
+        m.promotion,
+        m.photo_url, -- Ajout de la photo depuis la table identité
+        u.date_edition,
+        u.diplome,
+        u.date_modification,
+        u.membre_active, 
+        u.situation, 
+        u.section, 
+        u.statut, 
+        u.titre,
+        u.email_oecfm,
+        u.adresse,
+        u.ville,
+        u.code_postal,
+        u.boite_postale,
+        u.telephone,
+        u.fax,
+        u.email_personnel,
+        u.email_professionnel,
+        u.poste,
+        u.region,
+        u.num_compte,
+        u.nombre_associe
+    FROM membresidentites m
+    LEFT JOIN membres_updates u ON u.id = (
+        SELECT id 
+        FROM membres_updates 
+        WHERE membre_id = m.id AND date_modification = :date_modif
+        ORDER BY date_modification DESC, id DESC
+        LIMIT 1
+    ) WHERE m.id = :membre_id 
+    ORDER BY m.nom ASC
+    `;
+
+    const lastData = await db.sequelize.query(query, {
+        replacements: { membre_id: membre_id ,date_modif:date_modif},
+        type: db.sequelize.QueryTypes.SELECT
+    });
+
+    res.json(lastData);
+  } catch (error) {
+    console.error("Erreur Situation Membre:", error);
+    res.status(500).json({ message: "Erreur lors de la récupération de la situation" });
+  }
+};
+
+exports.updateHistoriqueMembre = async (req, res) => {
+  try {
+    const { id } = req.params; // C'est l'ID de la ligne membres_updates
+    const updateData = req.body;
+
+    // On met à jour directement la ligne avec cet ID
+    // const [updatedRows] = await db.membres_updates.update(updateData, {
+    //   where: { id: id }
+    // });
+
+    // if (updatedRows === 0) {
+    //   return res.status(404).json({ message: "Version introuvable" });
+    // }
+
+    // res.json({ message: "Version mise à jour avec succès" });
+  } catch (error) {
+    console.error("Erreur PUT MembreUpdate:", error);
+    res.status(500).json({ message: "Erreur lors de la modification" });
+  }
+};
+
+exports.deleteHistoriqueMembre = async (req, res) => {
+  try {
+    const { id } = req.params; // ID de la ligne dans membres_updates
+
+    const deleted = await db.MembreUpdate.destroy({
+      where: { id: id }
+    });
+
+    if (!deleted) {
+      return res.status(404).json({ message: "Version non trouvée" });
+    }
+
+    res.json({ message: "Version supprimée avec succès" });
+  } catch (error) {
+    console.error("Erreur DELETE MembreUpdate:", error);
+    res.status(500).json({ message: "Erreur serveur lors de la suppression" });
+  }
+};
+
+exports.getMembreHistorique = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const historique = await db.membres_updates.findAll({
+      where: { 
+        membre_id: id 
+      },
+      order: [['date_modification', 'DESC'], ['id', 'DESC']]
+    });
+    
+    res.json(historique);
+  } catch (error) {
+    console.error("Erreur Situation Membre:", error);
+    res.status(500).json({ message: "Erreur lors de la récupération de la situation" });
+  }
 };

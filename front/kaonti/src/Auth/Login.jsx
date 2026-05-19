@@ -87,7 +87,7 @@ const LoginPage = () => {
               </Stack>
               
               <Typography variant="h4" sx={{ fontWeight: 800, color: 'primary.main' }}>
-                Portail Membres
+                Portail de Gestion des Membres
               </Typography>
               <Typography variant="body1" color="text.secondary">
                 Accédez à votre espace expert-comptable sécurisé.

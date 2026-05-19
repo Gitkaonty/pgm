@@ -28,6 +28,7 @@ import useAxiosPrivate from '../../config/axiosPrivate';
 import { jwtDecode } from 'jwt-decode';
 import useAuth from '../hooks/useAuth';
 import CreateAccountDialog from './MainLayout_createCompte';
+import packageJson from '../../package.json';
 
 const drawerWidth = 260;
 const closedDrawerWidth = 70;
@@ -243,9 +244,9 @@ const MainLayout = ({ children }) => {
                         open: openMembers,
                         onClick: handleMembersClick,
                         subItems: [
-                            ...(showMenuParametre ? [{ label: "Effectif total", path: "/membres/liste" }]: []),
+                            ...(showMenuParametre ? [{ label: "Informations permanentes", path: "/membres/liste" }]: []),
                             ...(showMenuParametre ? [{ label: "Mises à jour", path: "/membres/historique" }]: []),
-                            { label: "Situation membres", path: "/membres/situation" }
+                            { label: "Liste membres", path: "/membres/situation" }
                         ]
                     },
                     {
@@ -331,7 +332,7 @@ const MainLayout = ({ children }) => {
                 ))}
 
                 {/* ITEM : HISTORIQUE */}
-                <ListItemButton
+                {/* <ListItemButton
                     onClick={() => navigate('/historique')}
                     selected={location.pathname === '/historique'}
                     sx={{
@@ -343,7 +344,7 @@ const MainLayout = ({ children }) => {
                 >
                     <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}><HistoryOutlined /></ListItemIcon>
                     <ListItemText primary="Historique" sx={{ opacity: isHovered ? 1 : 0 }} />
-                </ListItemButton>
+                </ListItemButton> */}
 
                 {/* MENU PARAMÈTRES (TREEVIEW) */}
                 {
@@ -386,7 +387,7 @@ const MainLayout = ({ children }) => {
                                             '&.Mui-selected': { bgcolor: 'rgba(139, 195, 74, 0.12)', color: '#8BC34A', '&:before': { bgcolor: '#8BC34A' } }
                                         }}
                                     >
-                                        <ListItemText primary="Grille tarifaire" primaryTypographyProps={{ fontSize: '0.82rem' }} />
+                                        <ListItemText primary="Grille cotisation" primaryTypographyProps={{ fontSize: '0.82rem' }} />
                                     </ListItemButton>
                                 </List>
                             </Collapse>
@@ -409,6 +410,21 @@ const MainLayout = ({ children }) => {
                     )}
                 </Stack>
             </Box>
+
+            {/* MICRO-BLOC VERSION */}
+            <Box sx={{ pb: 1, textAlign: 'left', ml:3.5,width:100 }}>
+                <Typography 
+                    variant="caption" 
+                    sx={{ 
+                        color: 'rgba(255,255,255,0.25)', 
+                        fontFamily: 'monospace', 
+                        fontSize: '0.85rem',
+                        display: 'block'
+                    }}
+                >
+                    {isHovered? `Pgm v${packageJson.version}` : `v${packageJson.version}` }
+                </Typography>
+            </Box>
         </Box>
     );
 
@@ -427,11 +443,11 @@ const MainLayout = ({ children }) => {
             >
                 <Toolbar sx={{ justifyContent: 'space-between' }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                        Portail de Gestion de l'Ordre
+                        Portail de Gestion des Membres de l'OECFM
                     </Typography>
 
                     <Stack direction="row" spacing={2} alignItems="center">
-                        <IconButton color="inherit"><Badge badgeContent={4} color="error"><NotificationsOutlined /></Badge></IconButton>
+                        {/* <IconButton color="inherit"><Badge badgeContent={4} color="error"><NotificationsOutlined /></Badge></IconButton> */}
                         <Divider orientation="vertical" flexItem sx={{ bgcolor: 'rgba(255,255,255,0.2)' }} />
 
                         <Stack direction="row" spacing={1.5} alignItems="center" onClick={handleUserMenuOpen} sx={{ cursor: 'pointer' }}>
