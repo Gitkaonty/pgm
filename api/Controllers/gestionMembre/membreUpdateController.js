@@ -34,6 +34,21 @@ exports.createUpdate = async (req, res) => {
 
         // Avec Sequelize, on utilise le modèle directement
         const newRow = await MembreUpdate.create(data);
+
+        if (req.file) {
+            // Option A : Si vous stockez uniquement le nom du fichier original (ex: "photo.jpg")
+            const nomFichier = req.file.filename; 
+            
+            // Option B : Si vous stockez le chemin relatif (ex: "uploads/membres/photo.jpg")
+            // const nomFichier = req.file.path; 
+
+            // On met à jour la table principale grâce au membre_id présent dans data
+            await MembreIdentite.update(
+                { photo_url: nomFichier }, // Le nom du champ dans votre table membresidentites
+                { where: { id: data.membre_id } } // Assurez-vous que le champ s'appelle bien "membre_id" ou "id" selon votre structure
+            );
+        }
+
         res.status(201).json(newRow);
     } catch (error) {
         console.error("ERREUR CREATE :", error.message);
@@ -65,6 +80,20 @@ exports.updateRow = async (req, res) => {
     const [updated] = await MembreUpdate.update(data, {
       where: { id: row_Id }
     });
+
+    if (req.file) {
+        // Option A : Si vous stockez uniquement le nom du fichier original (ex: "photo.jpg")
+        const nomFichier = req.file.filename; 
+        
+        // Option B : Si vous stockez le chemin relatif (ex: "uploads/membres/photo.jpg")
+        // const nomFichier = req.file.path; 
+
+        // On met à jour la table principale grâce au membre_id présent dans data
+        await MembreIdentite.update(
+            { photo_url: nomFichier }, // Le nom du champ dans votre table membresidentites
+            { where: { id: data.membre_id } } // Assurez-vous que le champ s'appelle bien "membre_id" ou "id" selon votre structure
+        );
+    }
 
     if (updated) {
       const updatedRow = await MembreUpdate.findByPk(id);

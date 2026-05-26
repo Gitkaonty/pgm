@@ -9,6 +9,7 @@ const exercice = db.exercices;
 const emaillog = db.emaillogs;
 const appel = db.appels;
 const user = db.users;
+const appUrl = process.env.APP_URL || "https://www.pgm.oecfm.mg";
 
 const TicketCaisseTemplate = require('../../Utils/ticketCaisseTemplate');
 const { renderToStream } = require('@react-pdf/renderer');
@@ -212,7 +213,7 @@ const performEmailSending = async (paiementId, dateFin) => {
             })
         );
 
-        const appUrl = "https://www.pgm-oecfm.mg";
+        //const appUrl = "https://www.pgm-oecfm.mg";
 
         // 3. Envoi
         await transporter.sendMail({

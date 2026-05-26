@@ -9,6 +9,7 @@ const paiement = db.paiements;
 const Attestation = db.attestations;
 const membre = db.membres;
 const user = db.users;
+const appUrl = process.env.APP_URL || "https://www.pgm.oecfm.mg";
 
 const formatDate = (date) => {
     if (!date) return "";
@@ -211,7 +212,7 @@ exports.create = async (req, res) => {
 
         const destinatairesSeretaireUnique = [...new Set(destinatairesCCUniques)].filter(email => email !== emailPresident);
 
-        const appUrl = process.env.APP_URL || "https://www.pgm-oecfm.mg"; // Exemple d'URL
+        //const appUrl = process.env.APP_URL || "https://www.pgm-oecfm.mg"; // Exemple d'URL
 
         // 2. Transporteur
         const transporter = nodemailer.createTransport({
@@ -519,7 +520,7 @@ exports.validateStep = async (req, res) => {
             tls: { rejectUnauthorized: false }
         });
 
-        const appUrl = process.env.APP_URL || "https://www.pgm-oecfm.mg";
+        //const appUrl = process.env.APP_URL || "https://www.pgm-oecfm.mg";
 
         // --- ENVOI SELON LE STEP 3 VALIDATION SECRETAIRE (NON GENERAL) ---
         if (step === 3 && emailSecretaireGen) {
@@ -555,7 +556,7 @@ exports.validateStep = async (req, res) => {
                         </p>
                         
                         <div style="text-align: center; margin: 25px 0;">
-                            <a href="${appUrl}/admin/attestations/validation-sg" style="background: #435844; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                            <a href="${appUrl}/attestations/validation" style="background: #435844; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
                                 Voir l'attestation à valider
                             </a>
                         </div>
@@ -591,7 +592,7 @@ exports.validateStep = async (req, res) => {
                             En attente de votre validation finale ou rejet.
                         </p>
                         <div style="text-align: center; margin: 20px;">
-                            <a href="${appUrl}/admin/attestations/validation-finale" style="background: #2563eb; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                            <a href="${appUrl}/attestations/validation" style="background: #2563eb; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
                                 Décider de la validation
                             </a>
                         </div>
@@ -632,7 +633,7 @@ exports.validateStep = async (req, res) => {
                             <p>Vous pouvez dès à présent consulter et télécharger votre document original en vous connectant à votre espace personnel sur la plateforme <strong>PGM (Portail de Gestion des Membres)</strong>.</p>
 
                             <div style="text-align: center; margin: 30px 0;">
-                                <a href="${appUrl}/mes-attestations" style="background-color: #497a48; color: white; padding: 14px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                                <a href="${appUrl}/attestation/demande" style="background-color: #497a48; color: white; padding: 14px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
                                     Télécharger mon attestation
                                 </a>
                             </div>
@@ -686,7 +687,7 @@ exports.validateStep = async (req, res) => {
                     <p>Nous vous invitons à vous connecter à votre espace personnel pour vérifier les éventuels motifs de rejet (pièces manquantes, informations erronées ou situation non régularisée) et soumettre une nouvelle demande corrigée.</p>
 
                     <div style="text-align: center; margin: 30px 0;">
-                        <a href="${appUrl}/mes-attestations" style="background-color: #e11d48; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                        <a href="${appUrl}/attestation/demande" style="background-color: #e11d48; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
                             Consulter ma demande
                         </a>
                     </div>

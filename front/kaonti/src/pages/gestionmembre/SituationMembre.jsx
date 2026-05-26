@@ -14,14 +14,16 @@ import {
 } from '@mui/icons-material';
 import toast, { Toaster } from 'react-hot-toast';
 import useAxiosPrivate from '../../../config/axiosPrivate';
+import MembrePDFOfficiel from './SituationMembrePDF';
 
 // Bibliothèques pour l'export
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
-import { PDFDownloadLink } from '@react-pdf/renderer';
 import FicheMembrePDF from './FicheMembrePDF';
 import { URL } from '../../../config/axios';
+import { pdf } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, Image } from '@react-pdf/renderer';
 
 // --- Helper pour les Badges (Style Bouton SaaS) ---
 const renderBadge = (params, colorMap) => {
@@ -87,10 +89,36 @@ const SituationMembre = () => {
   const drawerContentRef = useRef(null); // Référence pour l'export PDF
   const [exercices, setExercices] = useState([]);
   const [rows, setRows] = useState([]);
+  const [membreOfficiel, setMembreOfficiel] = useState([]);
+  const [information, setInformation] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedMembre, setSelectedMembre] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [filters, setFilters] = useState({ exerciceId: '', dateDebut: '', dateFin: '' });
+
+  // useEffect(() => {
+  //     fetchSettings();
+  // }, []);
+
+  const fetchOECFMSettings = async () => {
+      try {
+          const res = await axiosPrivate.get('/api/settings-ordre');
+          if (res.data) setInformation(res.data);
+      } catch (err) {
+          showNotify("Erreur lors du chargement des données", "error");
+      }
+  };
+
+  const fetchMembreSettings = async () => {
+    if (!filters.exerciceId) return toast.error("Sélectionnez un exercice");
+    setLoading(true);
+    try {
+      const response = await axiosPrivate.get('/api/membres-situation/infosTableau', { params: filters });
+      setMembreOfficiel(response.data);
+      setLoading(false);
+    } catch (error) { toast.error("Erreur de recherche Sittings"); }
+    finally { setLoading(false); }
+  };
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -108,6 +136,7 @@ const SituationMembre = () => {
       } catch (err) { toast.error("Erreur de chargement"); }
     };
     fetchInitialData();
+    fetchOECFMSettings();
   }, [axiosPrivate]);
 
   const handleSearch = async () => {
@@ -116,6 +145,7 @@ const SituationMembre = () => {
     try {
       const response = await axiosPrivate.get('/api/membres-situation', { params: filters });
       setRows(response.data);
+      fetchMembreSettings();
       toast.success(`${response.data.length} membres trouvés`);
     } catch (error) { toast.error("Erreur de recherche"); }
     finally { setLoading(false); }
@@ -232,6 +262,29 @@ const SituationMembre = () => {
     { field: 'date_edition', headerName: 'Date édition', width: 110, valueFormatter: (p) => p.value ? new Date(p.value).toLocaleDateString('fr-FR') : '' },
   ], []);
 
+  //imprimer le tableau de l'ordre
+  //export tableau Appel vers pdf
+  const handlePrintTableau = async () => {
+    try {
+      setLoading(true);
+      const doc = (
+        <MembrePDFOfficiel
+          membres={membreOfficiel}
+          information={information}
+        />
+      );
+
+      // 3. On crée un Blob et on l'ouvre dans un nouvel onglet
+      const blob = await pdf(doc).toBlob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setLoading(false);
+    } catch (error) {
+      console.error("Erreur impression:", error);
+      toast.error("Impossible de générer le PDF");
+    }
+  };
+
   return (
     <Box sx={{ p: 0, bgcolor: '#f8fafc', minHeight: '100vh' }}>
       <Toaster position="top-right" />
@@ -299,6 +352,15 @@ const SituationMembre = () => {
             </Box>
             <Box sx={{ flex: 1 }}></Box>
             <Button variant="contained" startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SearchOutlined />} onClick={handleSearch} disabled={loading} sx={{ height: 40, px: 4, borderRadius: '10px', bgcolor: '#2d6a4f', '&:hover': { bgcolor: '#1b4332' }, textTransform: 'none', fontWeight: 700 }}>Actualiser</Button>
+            <Button
+              onClick={() => handlePrintTableau()}
+              //size="small"
+              variant="outlined"
+              startIcon={loading ? <CircularProgress size={20} /> : <LocalPrintshopOutlined size={20} />}
+              sx={{ height: 40, color: '#b91c1c', borderColor: '#b91c1c', fontWeight: 700, borderRadius: '10px', textTransform: 'none' }}
+            >
+              Imprimer le Tableau
+            </Button>
           </Stack>
         </Stack>
       </Paper>
@@ -308,12 +370,12 @@ const SituationMembre = () => {
         <DataGrid
           rows={rows} columns={columns} loading={loading} rowHeight={52} disableRowSelectionOnClick
           initialState={{ pinnedColumns: { left: ['actions', 'photo_url', 'matricule', 'nom', 'prenom'] } }}
-          slots={{ toolbar: GridToolbar }} 
+          slots={{ toolbar: GridToolbar }}
           slotProps={{
-              toolbar: {
-                  showQuickFilter: true, // Affiche le champ de recherche
-                  quickFilterProps: { debounceMs: 500 }, // Optionnel : attend 500ms avant de filtrer
-              },
+            toolbar: {
+              showQuickFilter: true, // Affiche le champ de recherche
+              quickFilterProps: { debounceMs: 500 }, // Optionnel : attend 500ms avant de filtrer
+            },
           }}
           sx={{ border: 'none', '& .MuiDataGrid-columnHeaders': { bgcolor: '#f8fafb', color: '#475569', fontWeight: 800, fontSize: '0.75rem' } }}
         />
@@ -337,7 +399,7 @@ const SituationMembre = () => {
                 </IconButton>
                 <Stack direction="row" spacing={0} alignItems="center">
                   <Avatar
-                    src={selectedMembre.photo_url ? `http://localhost:5100/uploads/profiles/${selectedMembre.photo_url}` : ''}
+                    src={selectedMembre.photo_url ? `${URL}/uploads/profiles/${selectedMembre.photo_url}` : ''}
                     sx={{ width: 80, height: 80, border: '4px solid rgba(255,255,255,0.2)', boxShadow: '0 8px 20px rgba(0,0,0,0.15)' }}
                   />
                   <Box sx={{ ml: 2 }}>

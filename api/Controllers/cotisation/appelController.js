@@ -13,6 +13,7 @@ const TicketNoteTemplate = require('../../Utils/ticketNoteTemplante');
 const { renderToStream } = require('@react-pdf/renderer');
 const React = require('react');
 const { renderToBuffer } = require('@react-pdf/renderer');
+const appUrl = process.env.APP_URL || "https://www.pgm.oecfm.mg";
 
 // Requête SQL pour la situation des membres (commune aux calculs)
 const querySituation = `
@@ -738,8 +739,6 @@ const performEmailSending = async (appelId, dateFin) => {
             auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
             tls: { rejectUnauthorized: false }
         });
-
-        const appUrl = "https://www.pgm-oecfm.mg";
 
         // 3. Calculer la synthèse SANS passer par une requête HTTP
         const synthese = await calculerDonneesSynthese(

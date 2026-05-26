@@ -9,7 +9,7 @@ import {
   Table,
   TableBody,
   TableRow,
-  TableCell
+  TableCell,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import {
@@ -25,6 +25,7 @@ import {
 } from '@mui/icons-material';
 import toast, { Toaster } from 'react-hot-toast';
 import useAxiosPrivate from '../../../config/axiosPrivate';
+import { URL } from '../../../config/axios';
 
 const MyBreadcrumbs = ({ currentPath }) => (
   <Breadcrumbs separator={<NavigateNext fontSize="small" />} sx={{ mb: 2 }}>
@@ -78,11 +79,25 @@ const options = {
   poste: ['Caissier', 'Conseiller', 'Membre', 'Président', 'Président d honneur', 'Vice-Président Administratif', 'Vice-Président Technique', 'Secrétaire Exécutif', 'Secrétaire Général', 'Secrétaire Général Adjoint', 'Trésorier'],
   situation: ['En activité', 'Inactive', 'Suspendu'],
   sexe: [{ val: 'M', lab: 'Masculin' }, { val: 'F', lab: 'Féminin' }],
-  active: ['Oui', 'Non']
+  active: ['Oui', 'Non'],
+  region: ["Alaotra-Mangoro",	"Amoron'i Mania",	"Analamanga",	"Analanjirofo",	"Androy",	"Anosy",	"Atsimo-Andrefana",	"Atsimo-Atsinanana",	"Atsinanana",	"Betsiboka",	"Boeny",	"Bongolava",	"Diana",	"Fitovinany",	"Ihorombe",	"Itasy",	"Matsiatra Ambony",	"Melaky",	"Menabe",	"Sava",	"Sofia",	"Vakinankaratra",	"Vatovavy"]
 };
 
-const EditMembreDrawer = ({ open, onClose, formData, setFormData, onSave, onFinalSubmit, datesHistorique, selectedDate, handleVersionChange, onDeleteVersion }) => {
+const regionListe = ["Alaotra-Mangoro",	"Amoron'i Mania",	"Analamanga",	"Analanjirofo",	"Androy",	"Anosy",	"Atsimo-Andrefana",	"Atsimo-Atsinanana",	"Atsinanana",	"Betsiboka",	"Boeny",	"Bongolava",	"Diana",	"Fitovinany",	"Ihorombe",	"Itasy",	"Matsiatra Ambony",	"Melaky",	"Menabe",	"Sava",	"Sofia",	"Vakinankaratra",	"Vatovavy"];
+
+const EditMembreDrawer = ({ open, onClose, formData, setFormData, onSave, onFinalSubmit, datesHistorique, selectedDate, handleVersionChange, onDeleteVersion, setSelectedFile }) => {
   const [openConfirmDelete, setOpenConfirmDelete] = useState(false);
+  const appUrl = URL;
+  //const [selectedFile, setSelectedFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+      setPreview(window.URL.createObjectURL(file));
+    }
+  };
 
   const handleChange = (field) => (e) => {
     setFormData({ ...formData, [field]: e.target.value });
@@ -121,12 +136,33 @@ const EditMembreDrawer = ({ open, onClose, formData, setFormData, onSave, onFina
               <CloseOutlined />
             </IconButton>
             <Stack direction="row" spacing={3} alignItems="center">
-              <Avatar
-                src={formData.photo_url ? `http://localhost:5100/uploads/profiles/${formData.photo_url}` : ''}
-                sx={{ width: 80, height: 80, border: '4px solid rgba(255,255,255,0.2)', boxShadow: '0 8px 20px rgba(0,0,0,0.3)' }}
+              <Box 
+                sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    gap: 2 // Ajoute un espace propre de 16px entre l'avatar et le bouton
+                  }}
               >
-                {formData.nom?.charAt(0)}
-              </Avatar>
+                <Avatar
+                  src={preview ? preview : (formData.photo_url ? `${appUrl}/uploads/profiles/${formData.photo_url}` : '')}
+                  sx={{ width: 80, height: 80, border: '4px solid rgba(255,255,255,0.2)', boxShadow: '0 8px 20px rgba(0,0,0,0.3)' }}
+                >
+                  {/* {formData.nom?.charAt(0)} */}
+                </Avatar>
+                <Button size="small" variant="outlined" component="label" sx={{ textTransform: 'none', mb: 0, color:'white', bgcolor: 'rgba(255,255,255,0.15)' }}>
+                    Modifier la photo
+                    <input
+                        key={formData.photo_url ? 'has-photo' : 'empty-photo'} // Force le reset de l'input quand preview change
+                        type="file" 
+                        hidden 
+                        accept="image/*" 
+                        onChange={handleFileChange} 
+                    />
+                </Button>
+              </Box>
+              
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: 800, mb: 0 }}>Modification Profil</Typography>
                 <Typography variant="body2" sx={{ opacity: 0.8 }}>
@@ -322,11 +358,26 @@ const EditMembreDrawer = ({ open, onClose, formData, setFormData, onSave, onFina
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>RÉGION</Typography>
-                  <FastTextField fullWidth size="small"
+                  <TextField
+                    select={true}
+                    fullWidth size="small"
+                    type={'text'}
+                    value={formData.region || ''}
+                    onChange={handleChange('region')}
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+                  >
+                    {regionListe.map((o) => (
+                      <MenuItem key={o} value={o}>{o}</MenuItem>
+                    ))}
+                  </TextField>
+                  
+                  
+                  
+                  {/* <FastTextField fullWidth size="small"
                     value={formData.region || ''}
                     onChange={handleChange('region')}
                     onSave={(val) => setFormData({ ...formData, region: val })}
-                  />
+                  /> */}
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', mb: 0.5, display: 'block' }}>CODE POSTAL</Typography>
@@ -463,6 +514,7 @@ const MembreMiseAJourPro = () => {
 
   const [datesHistorique, setDatesHistorique] = useState([]);
   const [selectedDate, setSelectedDate] = useState('new'); // 'new' par défaut
+  const [selectedFile, setSelectedFile] = useState(null);
 
   // --- LOGIQUE DE COMPARAISON (TRACER) ---
   const getDiffFields = (current, previous) => {
@@ -598,18 +650,47 @@ const MembreMiseAJourPro = () => {
       if (selectedDate === 'new') {
         // CAS 1 : NOUVELLE VERSION
         // On envoie les données au serveur pour créer une nouvelle ligne
-        await axiosPrivate.post('/api/membres-updates', formData);
+
+        //attacher le nouveau fichier photo
+        const data = new FormData();
+        Object.keys(formData).forEach(key => {
+          if (formData[key] !== null && formData[key] !== undefined) {
+            data.append(key, formData[key]); // 👈 Tout votre texte est injecté ici !
+          }
+        });
+        
+        if (selectedFile) {
+            data.append('photo', selectedFile);
+        }
+
+        await axiosPrivate.post('/api/membres-updates', data,{
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
       } else {
         // CAS 2 : MODIFIER UNE VERSION EXISTANTE
         // On envoie un PUT vers une URL qui contient l'ID et la DATE précise
         // Exemple : /api/membres-updates/12/2026-05-12
 
-        await axiosPrivate.put(`/api/membres-updates/${formData.id}`, formData);
+        const data = new FormData();
+        Object.keys(formData).forEach(key => {
+          if (formData[key] !== null && formData[key] !== undefined) {
+            data.append(key, formData[key]); // 👈 Tout votre texte est injecté ici !
+          }
+        });
+        
+        if (selectedFile) {
+            data.append('photo', selectedFile);
+        }
+
+        await axiosPrivate.put(`/api/membres-updates/${formData.id}`, data,{
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
       }
 
       toast.success("Enregistré avec succès !", { id: loadId });
 
       // On ferme et on rafraîchit la liste
+      setSelectedFile(null);
       setOpenUpdate(false);
       fetchMembres();
 
@@ -649,12 +730,12 @@ const MembreMiseAJourPro = () => {
   const handleImportExcel = async () => {
     if (!importFile) return toast.error("Veuillez sélectionner un fichier");
 
-    const formData = new FormData();
-    formData.append('file', importFile);
+    const data = new FormData();
+    data.append('file', importFile);
     const loadId = toast.loading("Importation des données en cours...");
 
     try {
-      await axiosPrivate.post('/api/membres-updates/import-excel', formData, {
+      await axiosPrivate.post('/api/membres-updates/import-excel', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       toast.success("Importation réussie !", { id: loadId });
@@ -920,6 +1001,8 @@ const MembreMiseAJourPro = () => {
         selectedDate={selectedDate}
         handleVersionChange={handleVersionChange}
         onDeleteVersion={handleDeleteVersion}
+        selectedFile={selectedFile}
+        setSelectedFile={setSelectedFile}
       />
 
       {/* POPUP IMPORT FICHIER EXCEL */}

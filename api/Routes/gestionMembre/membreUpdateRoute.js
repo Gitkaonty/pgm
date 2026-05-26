@@ -4,15 +4,16 @@ const router = express.Router();
 const membreUpdateController = require('../../Controllers/gestionMembre/membreUpdateController');
 const uploadExcelFile = multer({ dest: 'uploads/temp/' });
 const verifyJWT = require('../../Middlewares/verifyJWT');
+const upload = require('../../Middlewares/upload');
 
 // Récupérer toutes les lignes
 router.get('/', verifyJWT, membreUpdateController.getAllUpdates);
 
 // Créer une nouvelle ligne (quand on clique sur Save après "Nouvelle mise à jour")
-router.post('/', verifyJWT, membreUpdateController.createUpdate);
+router.post('/', verifyJWT, upload.single('photo'), membreUpdateController.createUpdate);
 
 // Modifier une ligne existante
-router.put('/:id', verifyJWT, membreUpdateController.updateRow);
+router.put('/:id', verifyJWT, upload.single('photo'), membreUpdateController.updateRow);
 
 // Supprimer une ligne
 router.delete('/:id', verifyJWT, membreUpdateController.deleteUpdate);
