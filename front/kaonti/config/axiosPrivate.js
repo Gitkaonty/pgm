@@ -3,7 +3,7 @@ import axios from "axios";
 import useAuth from "../src/hooks/useAuth";
 
 const BASE_URL = "http://localhost:5150";
-//const BASE_URL = 'https://finance.inframad.com/api';
+//const BASE_URL = 'https://pgm.oecfm.mg';
 
 const axiosPrivate = axios.create({
     baseURL: BASE_URL,

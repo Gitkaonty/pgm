@@ -1,6 +1,6 @@
 import axios from "axios";
 const BASE_URL = 'http://localhost:5150';
-//const BASE_URL = 'https://finance.inframad.com/api';
+//const BASE_URL = 'https://pgm.oecfm.mg';
 
 export default axios.create({
     baseURL: BASE_URL,
