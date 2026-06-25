@@ -1,0 +1,8 @@
+const path = require('path');
+require('dotenv').config();
+
+// On pointe sequelize-cli vers le config JS (qui lit le .env) au lieu de config.json.
+module.exports = {
+    'config': path.resolve('config', 'config.js'),
+    'migrations-path': path.resolve('migrations'),
+};

@@ -14,6 +14,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import useAxiosPrivate from '../../../config/axiosPrivate';
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, Image } from '@react-pdf/renderer';
 import TicketNotePDF from './TicketNotePDF';
+import QRCode from 'qrcode';
 import { pdf } from '@react-pdf/renderer';
 import ExportAppelPDF from './AppelTableauPDF';
 
@@ -122,6 +123,7 @@ const AppelCotisation = () => {
   const [loadingData, setLoadingData] = useState(false);
   const [rows, setRows] = useState([]);
   const [rowsAjustement, setRowsAjustement] = useState([]);
+  const [rowsAutre, setRowsAutre] = useState([]);
 
   const [openAjustConfirm, setOpenAjustConfirm] = useState(false);
   const [membres, setMembres] = useState([]);
@@ -160,6 +162,19 @@ const AppelCotisation = () => {
 
   const [orderInfo, setOrderInfo] = useState({});
   const [loading, setLoading] = useState(false);
+
+  // Données de l'onglet courant (0=appels, 1=ajustements, 2=autres appel)
+  const activeRows = tabValue === 0 ? rows : tabValue === 1 ? rowsAjustement : rowsAutre;
+  // URL de chargement par onglet
+  const loadUrlFor = (id) => tabValue === 0
+    ? `/api/cotisations/exercice/${id}`
+    : tabValue === 1 ? `/api/cotisations/ajustements/${id}` : `/api/cotisations/autres-appels/${id}`;
+  // Applique les données au bon state selon l'onglet
+  const applyRows = (data) => {
+    if (tabValue === 0) setRows(data);
+    else if (tabValue === 1) setRowsAjustement(data);
+    else setRowsAutre(data);
+  };
 
   const formatNumber = (val) => {
     if (!val) return '';
@@ -201,10 +216,8 @@ const AppelCotisation = () => {
       if (!selectedEx) return;
       setLoadingData(true);
       try {
-        const endpoint = tabValue === 0 ? `/api/cotisations/exercice/${selectedEx}` : `/api/cotisations/ajustements/${selectedEx}`;
-        const res = await axiosPrivate.get(endpoint);
-        if (tabValue === 0) setRows(res.data);
-        else setRowsAjustement(res.data);
+        const res = await axiosPrivate.get(loadUrlFor(selectedEx));
+        applyRows(res.data);
       } catch (err) { } finally { setLoadingData(false); }
     };
     fetchData();
@@ -268,11 +281,15 @@ const AppelCotisation = () => {
   const confirmGenerateAjustement = async () => {
     setOpenAjustConfirm(false);
     setGenerating(true);
+    // tab 1 = ajustements, tab 2 = autres appel
+    const generateUrl = tabValue === 2
+      ? '/api/cotisations/generate-autres-appels'
+      : '/api/cotisations/generate-ajustements';
     try {
-      await axiosPrivate.post('/api/cotisations/generate-ajustements', { exerciceId: selectedEx, ...formAjust });
-      const res = await axiosPrivate.get(`/api/cotisations/ajustements/${selectedEx}`);
-      setRowsAjustement(res.data);
-      toast.success("Ajustements générés !");
+      await axiosPrivate.post(generateUrl, { exerciceId: selectedEx, ...formAjust });
+      const res = await axiosPrivate.get(loadUrlFor(selectedEx));
+      applyRows(res.data);
+      toast.success(tabValue === 2 ? "Autres appel générés !" : "Ajustements générés !");
     } catch (err) { toast.error("Erreur génération"); } finally { setGenerating(false); }
   };
 
@@ -282,22 +299,12 @@ const AppelCotisation = () => {
       await axiosPrivate.patch(`/api/cotisations/status/${row.id}`, {
         valide: !row.valide,
         // On envoie le type au backend pour qu'il sache quelle table viser
-        type: tabValue === 0 ? 'appels' : 'ajustements'
+        type: tabValue === 0 ? 'appels' : tabValue === 1 ? 'ajustements' : 'autres'
       });
 
-      // 2. On détermine quelle URL appeler pour rafraîchir le tableau actuel
-      const refreshUrl = tabValue === 0
-        ? `/api/cotisations/exercice/${selectedEx}`
-        : `/api/cotisations/ajustements/${selectedEx}`;
-
-      const res = await axiosPrivate.get(refreshUrl);
-
-      // 3. On met à jour le bon state selon l'onglet actif
-      if (tabValue === 0) {
-        setRows(res.data);
-      } else {
-        setRowsAjustement(res.data);
-      }
+      // 2. On rafraîchit le tableau de l'onglet courant
+      const res = await axiosPrivate.get(loadUrlFor(selectedEx));
+      applyRows(res.data);
 
       toast.success("Statut mis à jour");
     } catch (err) {
@@ -307,8 +314,8 @@ const AppelCotisation = () => {
   };
 
   const handleSaveFinal = async () => {
-    // 1. On identifie les données de l'onglet actif
-    const currentRows = tabValue === 0 ? rows : rowsAjustement;
+    // 1. Données de l'onglet actif
+    const currentRows = activeRows;
 
     // 2. On récupère uniquement les IDs des lignes non validées (brouillons)
     const ids = currentRows.filter(r => !r.valide).map(r => r.id);
@@ -318,28 +325,19 @@ const AppelCotisation = () => {
     }
 
     try {
-      // 3. On définit l'URL de validation globale selon l'onglet
-      // Note : Assure-toi que '/api/cotisations/valider-ajustements' existe côté Backend
+      // 3. URL de validation globale selon l'onglet
       const endpoint = tabValue === 0
         ? '/api/cotisations/valider-appels'
-        : '/api/cotisations/valider-ajustements';
+        : tabValue === 1 ? '/api/cotisations/valider-ajustements'
+        : '/api/cotisations/valider-autres-appels';
 
       await axiosPrivate.post(endpoint, { ids });
 
       toast.success("Toutes les lignes ont été validées !");
 
       // 4. On rafraîchit les données pour voir les changements (badges success)
-      const refreshUrl = tabValue === 0
-        ? `/api/cotisations/exercice/${selectedEx}`
-        : `/api/cotisations/ajustements/${selectedEx}`;
-
-      const res = await axiosPrivate.get(refreshUrl);
-
-      if (tabValue === 0) {
-        setRows(res.data);
-      } else {
-        setRowsAjustement(res.data);
-      }
+      const res = await axiosPrivate.get(loadUrlFor(selectedEx));
+      applyRows(res.data);
     } catch (err) {
       console.error(err);
       toast.error("Erreur lors de la validation globale");
@@ -380,7 +378,7 @@ const AppelCotisation = () => {
     },
     { field: 'num_note', headerName: 'Note référence', width: 210 },
     {
-      field: tabValue === 0 ? 'montant' : 'montant_ajustement',
+      field: tabValue === 0 ? 'montant' : tabValue === 1 ? 'montant_ajustement' : 'montant_autre',
       headerName: 'Montant dû',
       width: 150,
       align: 'right',
@@ -390,6 +388,14 @@ const AppelCotisation = () => {
     {
       field: 'total_ajustement',
       headerName: 'total ajustements',
+      width: 150,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: (p) => (<Typography sx={{ fontWeight: 800, color: '#2d6a4f', fontSize: '0.85rem' }}> {new Intl.NumberFormat('fr-MG').format(p.value || 0)} Ar </Typography>)
+    },
+    {
+      field: 'total_autre_appel',
+      headerName: 'total autres appel',
       width: 150,
       align: 'right',
       headerAlign: 'right',
@@ -476,14 +482,12 @@ const AppelCotisation = () => {
     }
   ].filter(col =>
     tabValue === 0 ||
-    (col.field !== 'regime' && col.field !== 'total_ajustement' && col.field !== 'appelnet' && col.field !== 'nb_envois')
+    (col.field !== 'regime' && col.field !== 'total_ajustement' && col.field !== 'total_autre_appel' && col.field !== 'appelnet' && col.field !== 'nb_envois')
   );
 
   const calculateTotal = () => {
-    const currentRows = tabValue === 0 ? rows : rowsAjustement;
-    return currentRows.reduce((sum, row) => {
-      // Vérifie le nom exact du champ renvoyé par ton backend
-      const val = tabValue === 0 ? row.montant : row.montant_ajustement;
+    return activeRows.reduce((sum, row) => {
+      const val = tabValue === 0 ? row.montant : tabValue === 1 ? row.montant_ajustement : row.montant_autre;
       return sum + (Number(val) || 0);
     }, 0);
   };
@@ -497,6 +501,10 @@ const AppelCotisation = () => {
     }, 0);
   };
 
+  const calculateTotalAutreAppel = () => {
+    return rows.reduce((sum, row) => sum + (Number(row.total_autre_appel) || 0), 0);
+  };
+
   const calculateTotalAppelNet = () => {
     const currentRows = tabValue === 0 ? rows : rowsAjustement;
     return currentRows.reduce((sum, row) => {
@@ -508,7 +516,8 @@ const AppelCotisation = () => {
 
   //export Excel
   const handleExportExcel = () => {
-    const currentRows = tabValue === 0 ? rows : rowsAjustement;
+    const currentRows = activeRows;
+    const montantOf = (r) => tabValue === 0 ? r.montant : tabValue === 1 ? r.montant_ajustement : r.montant_autre;
     const periode = getFullExerciceLabel();
 
     // --- CONFIGURATION DES STYLES ---
@@ -542,7 +551,7 @@ const AppelCotisation = () => {
       [{ v: "OECFM", s: { font: { bold: true, sz: 14, color: { rgb: "1B4332" } } } }],
       [{ v: "Ordre des Experts Comptables et Financiers de Madagascar", s: { font: { italic: true, sz: 10 } } }],
       [""],
-      [{ v: tabValue === 0 ? "TABLEAU DES APPELS DE COTISATIONS" : "LISTE DES AJUSTEMENTS", s: { font: { bold: true, sz: 12 } } }],
+      [{ v: tabValue === 0 ? "TABLEAU DES APPELS DE COTISATIONS" : tabValue === 1 ? "LISTE DES AJUSTEMENTS" : "LISTE DES AUTRES APPEL", s: { font: { bold: true, sz: 12 } } }],
       [`Période : ${periode}`],
       [""],
     ];
@@ -575,7 +584,7 @@ const AppelCotisation = () => {
         { v: row.associe || "-", s: styleText },
         { v: row.regime === "1" ? "Réduit" : row.regime === "0" ? "Normal" : "-", s: styleText },
         // Valeurs numériques converties en Float pour calculs
-        { v: parseFloat(tabValue === 0 ? row.montant : row.montant_ajustement) || 0, s: styleCellNum }
+        { v: parseFloat(montantOf(row)) || 0, s: styleCellNum }
       ];
 
       if (tabValue === 0) {
@@ -586,7 +595,7 @@ const AppelCotisation = () => {
     });
 
     // --- LIGNE DE TOTAL (FOOTER) ---
-    const totalCot = currentRows.reduce((sum, r) => sum + parseFloat(tabValue === 0 ? r.montant : r.montant_ajustement || 0), 0);
+    const totalCot = currentRows.reduce((sum, r) => sum + (parseFloat(montantOf(r)) || 0), 0);
     const totalAjust = currentRows.reduce((sum, r) => sum + parseFloat(r.total_ajustement || 0), 0);
     const totalNet = currentRows.reduce((sum, r) => sum + parseFloat(r.appelnet || 0), 0);
 
@@ -954,7 +963,23 @@ const AppelCotisation = () => {
         totalAPayer: soldeAnouveau - paiementRecuAnnee + row.appelnet
       };
 
-      // 2. On génère le PDF en mémoire
+      // 2. QR code → redirige vers la page du site selon la catégorie du membre :
+      //    - Expert Stagiaire   -> /fr/liste-stagiaire
+      //    - Tableau A          -> /fr/tableau-a
+      //    - Tableau B          -> /fr/tableau-b
+      const siteBase = import.meta.env.VITE_PUBLIC_SITE_URL || 'https://www.oecfm.mg';
+      let qrPath = '';
+      if (row.statut === 'Expert Stagiaire') {
+        qrPath = '/fr/liste-stagiaire';
+      } else if (row.titre === 'Tableau A') {
+        qrPath = '/fr/tableau-a';
+      } else if (row.titre === 'Tableau B') {
+        qrPath = '/fr/tableau-b';
+      }
+      const qrTarget = `${siteBase}${qrPath}`;
+      const qrDataUrl = await QRCode.toDataURL(qrTarget, { margin: 1, width: 240 });
+
+      // 3. On génère le PDF en mémoire
       const doc = (
         <TicketNotePDF
           row={row}
@@ -962,6 +987,7 @@ const AppelCotisation = () => {
           selectedEx={selectedEx}
           orderInfo={orderInfo}
           synthese={syntheseData}
+          qrDataUrl={qrDataUrl}
         />
       );
 
@@ -977,13 +1003,13 @@ const AppelCotisation = () => {
   };
 
   //export tableau Appel vers pdf
-  const handlePrintAppelTable = async (rows, rowsAjustement, exerciceLabel, tabValue) => {
+  const handlePrintAppelTable = async (data, exerciceLabel, tabValueArg) => {
     try {
       setLoading(true);
       const doc = (
         <ExportAppelPDF
-          data={tabValue === 0 ? rows : rowsAjustement}
-          tabValue={tabValue}
+          data={data}
+          tabValue={tabValueArg}
           exerciceLabel={exerciceLabel}
         />
       );
@@ -1065,10 +1091,8 @@ const AppelCotisation = () => {
       if (!selectedEx) return;
       setLoadingData(true);
       try {
-        const endpoint = tabValue === 0 ? `/api/cotisations/exercice/${selectedEx}` : `/api/cotisations/ajustements/${selectedEx}`;
-        const res = await axiosPrivate.get(endpoint);
-        if (tabValue === 0) setRows(res.data);
-        else setRowsAjustement(res.data);
+        const res = await axiosPrivate.get(loadUrlFor(selectedEx));
+        applyRows(res.data);
       } catch (err) { } finally { setLoadingData(false); }
 
     } catch (err) {
@@ -1099,10 +1123,8 @@ const AppelCotisation = () => {
       if (!selectedEx) return;
       setLoadingData(true);
       try {
-        const endpoint = tabValue === 0 ? `/api/cotisations/exercice/${selectedEx}` : `/api/cotisations/ajustements/${selectedEx}`;
-        const res = await axiosPrivate.get(endpoint);
-        if (tabValue === 0) setRows(res.data);
-        else setRowsAjustement(res.data);
+        const res = await axiosPrivate.get(loadUrlFor(selectedEx));
+        applyRows(res.data);
       } catch (err) { } finally { setLoadingData(false); }
 
     } catch (err) {
@@ -1203,7 +1225,7 @@ const AppelCotisation = () => {
     const visibleRows = visibleIds.map((id) => apiRef.current.getRow(id));
 
     // Calculs
-    const totalMontant = visibleRows.reduce((sum, row) => sum + (Number(row?.montant_ajustement) || 0), 0);
+    const totalMontant = visibleRows.reduce((sum, row) => sum + (Number(row?.montant_ajustement ?? row?.montant_autre) || 0), 0);
 
     const fNum = (val) => new Intl.NumberFormat('fr-FR').format(val);
 
@@ -1262,6 +1284,8 @@ const AppelCotisation = () => {
                 // On utilise un tableau vide [] comme fallback pour que le spread ne plante pas
                 ...(tabValue === 0 ? [{ label: 'AJUSTEMENTS', val: calculateTotalAjustement(), color: '#64748b' }] : []),
 
+                ...(tabValue === 0 ? [{ label: 'AUTRES APPEL', val: calculateTotalAutreAppel(), color: '#64748b' }] : []),
+
                 ...(tabValue === 0 ? [{ label: 'APPEL NET', val: calculateTotalAppelNet(), color: '#2563EB' }] : []),
               ].map((item, index) => (
                 <Box key={index} sx={{ textAlign: 'right', minWidth: '120px' }}>
@@ -1302,6 +1326,7 @@ const AppelCotisation = () => {
           <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)} textColor="primary" indicatorColor="primary">
             <Tab label="Calcul Appel" sx={{ fontWeight: 700, textTransform: 'none' }} />
             <Tab label="Ajustements" sx={{ fontWeight: 700, textTransform: 'none' }} />
+            <Tab label="Autres appel" sx={{ fontWeight: 700, textTransform: 'none' }} />
           </Tabs>
         </Box>
 
@@ -1348,7 +1373,7 @@ const AppelCotisation = () => {
             Télécharger Excel
           </Button>
           <Button
-            onClick={() => handlePrintAppelTable(rows, rowsAjustement, getFullExerciceLabel(), tabValue)}
+            onClick={() => handlePrintAppelTable(activeRows, getFullExerciceLabel(), tabValue)}
             size="small"
             variant="outlined"
             startIcon={loading ? <CircularProgress size={16} /> : <LocalPrintshopOutlined />}
@@ -1361,14 +1386,14 @@ const AppelCotisation = () => {
 
         <Paper elevation={0} sx={{ borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
           <Box sx={{ p: 2, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#475569' }}>{(tabValue === 0 ? rows.length : rowsAjustement.length)} Membres calculés</Typography>
-            {(tabValue === 0 ? rows.length : rowsAjustement.length) > 0 && (
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#475569' }}>{activeRows.length} Membres calculés</Typography>
+            {activeRows.length > 0 && (
               <Button size="small" startIcon={<SaveIcon />} variant="contained" color="success" onClick={handleSaveFinal} sx={{ fontWeight: 700, borderRadius: '8px', px: 3, boxShadow: 'none' }}>Tout Valider (Définitif)</Button>
             )}
           </Box>
           <Box sx={{ height: '40vh', width: '100%' }}>
             <DataGrid
-              rows={tabValue === 0 ? rows : rowsAjustement}
+              rows={activeRows}
               columns={columns}
               loading={loadingData}
               // Ajoute ces options pour la pagination
@@ -1380,7 +1405,7 @@ const AppelCotisation = () => {
               pageSizeOptions={[5, 10, 25, 50, 100]}
               disableRowSelectionOnClick
               rowHeight={38}
-              slots={{ toolbar: GridToolbar, footer: tabValue ===0? CustomFooter: CustomFooterAjustement }}
+              slots={{ toolbar: GridToolbar, footer: tabValue === 0 ? CustomFooter : CustomFooterAjustement }}
               slotProps={{
                 toolbar: {
                   showQuickFilter: true, // Affiche le champ de recherche
@@ -1442,7 +1467,7 @@ const AppelCotisation = () => {
       >
         <DialogTitle sx={{ fontWeight: 900, fontSize: '1.2rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <FilterListIcon sx={{ color: '#2d6a4f' }} />
-          {tabValue === 0 ? "Génération Appel Manuel" : "Génération des ajustements"}
+          {tabValue === 0 ? "Génération Appel Manuel" : tabValue === 1 ? "Génération des ajustements" : "Génération des autres appel"}
         </DialogTitle>
 
         <DialogContent>
@@ -1452,7 +1477,7 @@ const AppelCotisation = () => {
 
           <Grid container spacing={3}>
             {/* Champ Motif affiché seulement pour l'onglet Ajustement */}
-            {tabValue === 1 && (
+            {tabValue !== 0 && (
               <Grid item xs={12}>
                 <InputLabel sx={{ mb: 0.5, fontWeight: 700, fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' }}>Motif</InputLabel>
                 <TextField
@@ -1466,7 +1491,7 @@ const AppelCotisation = () => {
               </Grid>
             )}
 
-            {tabValue === 1 && (
+            {tabValue !== 0 && (
               <Grid item xs={12}>
                 <InputLabel sx={{ mb: 0.5, fontWeight: 700, fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' }}>Montant (Ar)</InputLabel>
                 <TextField
@@ -1593,7 +1618,7 @@ const AppelCotisation = () => {
             variant="contained"
             sx={{ bgcolor: '#2d6a4f', '&:hover': { bgcolor: '#1b4332' }, fontWeight: 700, textTransform: 'none', px: 4, borderRadius: '10px' }}
           >
-            {tabValue === 0 ? "Lancer l'appel" : "Ajouter l'ajustement"}
+            {tabValue === 0 ? "Lancer l'appel" : tabValue === 1 ? "Ajouter l'ajustement" : "Ajouter l'autre appel"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1622,16 +1647,13 @@ const AppelCotisation = () => {
                 // 1. Appel au backend (choix de l'url selon l'onglet)
                 const url = tabValue === 0
                   ? `/api/cotisations/${rowToDelete.id}`
-                  : `/api/cotisations/ajustements/${rowToDelete.id}`;
+                  : tabValue === 1 ? `/api/cotisations/ajustements/${rowToDelete.id}`
+                  : `/api/cotisations/autres-appels/${rowToDelete.id}`;
 
                 await axiosPrivate.delete(url);
 
                 // 2. Mise à jour de l'interface locale
-                if (tabValue === 0) {
-                  setRows(rows.filter(r => r.id !== rowToDelete.id));
-                } else {
-                  setRowsAjustement(rowsAjustement.filter(r => r.id !== rowToDelete.id));
-                }
+                applyRows(activeRows.filter(r => r.id !== rowToDelete.id));
 
                 setOpenConfirm(false);
                 toast.success("Supprimé avec succès");

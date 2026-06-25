@@ -13,6 +13,7 @@ module.exports = (sequelize, Sequelize) => {
         associe: { type: Sequelize.INTEGER },
         valide: { type: Sequelize.BOOLEAN, defaultValue: false },
         total_ajustement: { type: Sequelize.DECIMAL(15, 2), defaultValue: 0 },
+        total_autre_appel: { type: Sequelize.DECIMAL(15, 2), defaultValue: 0 },
         appelnet: { type: Sequelize.DECIMAL(15, 2), defaultValue: 0 },
         num_auto: { 
             type: Sequelize.BIGINT, 

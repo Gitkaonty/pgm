@@ -344,6 +344,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignContent: 'center',
     },
+    tableauDate: {
+        fontFamily: 'RobotoCondensed',
+        color: '#6A8392',
+        fontSize: 7,
+        textAlign: 'center',
+        marginTop: 1,
+    },
 
 
 });
@@ -588,6 +595,9 @@ const Header = ({ information, membres }) => {
                 <Text style={styles.tableauText}>Tableau</Text>
                 <Text style={styles.tableauAnnee}>
                     {lastYear} - {actualYear}
+                </Text>
+                <Text style={styles.tableauDate}>
+                    Édité le {dayjs().format('DD/MM/YYYY')}
                 </Text>
             </View>
 

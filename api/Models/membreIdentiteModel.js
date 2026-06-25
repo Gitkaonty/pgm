@@ -58,7 +58,7 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: true
         },
         login_id: { type: DataTypes.INTEGER, allowNull: true, defaultValue:0 }
-    }, { 
+    }, {
         timestamps: true // Crée automatiquement createdAt et updatedAt login_id
     });
 

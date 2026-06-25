@@ -48,6 +48,7 @@ db.grille_tarifaires = require('./grilleTarifaire')(sequelize, Sequelize);
 //paramètres cotisation
 db.appels = require("./appelModel")(sequelize, Sequelize);
 db.ajustementappels = require("./ajustementappel")(sequelize, Sequelize);
+db.autres_appels = require("./autreAppel")(sequelize, Sequelize);
 db.paiements = require("./paiementModel")(sequelize, Sequelize);
 db.emaillogs = require("./emailLog")(sequelize, Sequelize);
 db.emaillogsappels = require("./emailLogAppel")(sequelize, Sequelize);

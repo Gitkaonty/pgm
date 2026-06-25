@@ -11,7 +11,7 @@ const fNum = (val) => {
 };
 
 //export PDF du ticket de caisse
-const TicketCaissePDF = ({ row, exercice, selectedEx, orderInfo }) => {
+const TicketCaissePDF = ({ row, exercice, selectedEx, orderInfo, qrDataUrl }) => {
     const data = Array.isArray(orderInfo) ? orderInfo[0] : orderInfo;
     const url = URL;
 
@@ -94,6 +94,16 @@ const TicketCaissePDF = ({ row, exercice, selectedEx, orderInfo }) => {
     return (
         <Document>
             <Page size="A4" style={{ padding: 40, fontSize: 10, fontFamily: 'Helvetica' }}>
+                {/* QR code → site de l'ordre (haut à droite) */}
+                {qrDataUrl && (
+                    <View style={{ position: 'absolute', top: 165, right: 45, alignItems: 'center' }}>
+                        <Image src={qrDataUrl} style={{ width: 95, height: 95 }} />
+                        <Text style={{ fontSize: 7, color: '#64748b', marginTop: 2 }}>
+                            Scannez-moi
+                        </Text>
+                    </View>
+                )}
+
                 {/* Header avec Logo (Placeholder) */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
                     {/* LOGO à gauche */}
@@ -195,37 +205,37 @@ const TicketCaissePDF = ({ row, exercice, selectedEx, orderInfo }) => {
                 {/* Signatures */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 50 }}>
                     <View style={{ width: 220, flexDirection: 'column', justifyContent: 'space-between', marginTop: 0, alignContent: 'center', alignItems: 'center' }}>
-                        <Text style={{ textAlign: 'center' }}>Le Vice-Président</Text>
-                        <Text style={{ textAlign: 'center' }}>Administratif</Text>
+                        <Text style={{ textAlign: 'center',marginBottom: '-20px' }}>Le Vice-Président</Text>
+                        <Text style={{ textAlign: 'center',marginBottom: '-20px' }}>Administratif</Text>
                         {row.valide &&
                             <Image
-                                style={{ width: 100, height: 100, objectFit: 'contain' }}
+                                style={{ width: 200 }}
                                 src={`${url}/uploads/signatures/${data.sig_vice_president_admin}`}
                             />
                         }
-                        <Text style={{ marginTop: row.valide ? 0 : 50, textAlign: 'center' }}>{nom_vice_president_admin}</Text>
+                        <Text style={{ marginTop: '-60px' }}>{nom_vice_president_admin}</Text>
                     </View>
 
                     <View style={{ width: 220, flexDirection: 'column', justifyContent: 'space-between', marginTop: 0, alignContent: 'center', alignItems: 'center' }}>
-                        <Text style={{ textAlign: 'center' }}>Le Trésorier</Text>
+                        <Text style={{ textAlign: 'center',marginBottom: '-60px' }}>Le Trésorier</Text>
                         {row.valide &&
                             <Image
-                                style={{ width: 100, height: 100, objectFit: 'contain' }}
+                                style={{ width: 200 }}
                                 src={`${url}/uploads/signatures/${data.sig_tresorier}`}
                             />
                         }
-                        <Text style={{ marginTop: row.valide ? 0 : 50, textAlign: 'center' }}>{nom_tresorier}</Text>
+                        <Text style={{ marginTop: '-110px' }}>{nom_tresorier}</Text>
                     </View>
 
                     <View style={{ width: 220, flexDirection: 'column', justifyContent: 'space-between', marginTop: 0, alignContent: 'center', alignItems: 'center' }}>
-                        <Text style={{ textAlign: 'center' }}>Le Caissier</Text>
+                        <Text style={{ marginBottom: '-60px',textAlign: 'center' }}>Le Caissier</Text>
                         {row.valide &&
                             <Image
-                                style={{ width: 100, height: 100, objectFit: 'contain' }}
+                                style={{ width: 200 }}
                                 src={`${url}/uploads/signatures/${data.sig_caissier}`}
                             />
                         }
-                        <Text style={{ marginTop: row.valide ? 0 : 50, textAlign: 'center' }}>{nom_caissier}</Text>
+                        <Text style={{ marginTop: '-120px' }}>{nom_caissier}</Text>
                     </View>
 
                     <Text style={{ width: 220, textAlign: 'center' }}>Le Remettant</Text>

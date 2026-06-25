@@ -38,6 +38,23 @@ const createExercice = async (req, res) => {
 const deleteExercice = async (req, res) => {
     try {
         const { id } = req.params;
+
+        // Contrôle : on refuse la suppression si des données sont rattachées à cet exercice
+        const [nbAppels, nbAjust, nbAutres, nbPaiements, nbGrille] = await Promise.all([
+            db.appels.count({ where: { exercice_id: id } }),
+            db.ajustementappels.count({ where: { exercice_id: id } }),
+            db.autres_appels.count({ where: { exercice_id: id } }),
+            db.paiements.count({ where: { exercice_id: id } }),
+            db.grille_tarifaires.count({ where: { exercice_id: id } }),
+        ]);
+
+        const total = nbAppels + nbAjust + nbAutres + nbPaiements + nbGrille;
+        if (total > 0) {
+            return res.status(400).json({
+                message: "Impossible de supprimer : des données sont déjà rattachées à cet exercice (appels, ajustements, autres appel, paiements ou grille tarifaire)."
+            });
+        }
+
         const deleted = await Exercice.destroy({
             where: { id: id }
         });

@@ -22,8 +22,9 @@ import GrandLivrePage from './pages/cotisation/GrandLivre';
 import OrderInfoPage from './pages/oecfm';
 import AttestationsPage from './pages/attestation/attestation';
 import ValidationAttestationsPage from './pages/attestation/validation';
+import MembrePublic from './pages/public/MembrePublic';
 // Importe ton hook d'auth pour remplacer "isAuthenticated" par une vraie valeur
-import useAuth from './hooks/useAuth'; 
+import useAuth from './hooks/useAuth';
 
 const ROLES = {
   'SuperAdmin': 3355,
@@ -41,6 +42,9 @@ export default function App() {
       <CssBaseline />
       <Toaster position="top-right" />
       <Routes>
+        {/* Page publique (scan QR) — hors authentification et hors layout app */}
+        <Route path="/m/:id" element={<MembrePublic />} />
+
         <Route path="/" element={<Layout />}>
           
           {/* --- ROUTES PUBLIQUES --- */}

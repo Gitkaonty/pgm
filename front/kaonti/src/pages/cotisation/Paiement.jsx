@@ -39,6 +39,7 @@ import useAuth from '../../hooks/useAuth';
 import { pdf } from '@react-pdf/renderer';
 import PaiementTableauPDF from './PaiementTableauPDF';
 import TicketCaissePDF from './TicketCaissePDF';
+import QRCode from 'qrcode';
 
 const MyBreadcrumbs = ({ currentPath }) => (
     <Breadcrumbs separator={<NavigateNext fontSize="small" />} sx={{ mb: 2 }}>
@@ -1063,12 +1064,18 @@ const PaiementPage = () => {
     const handlePrintCaisse = async (row, exercices, orderInfo, selectedEx) => {
         try {
             setLoading(true);
+
+            // QR code → redirige simplement vers le site de l'ordre
+            const qrTarget = import.meta.env.VITE_PUBLIC_SITE_URL || 'https://www.oecfm.mg';
+            const qrDataUrl = await QRCode.toDataURL(qrTarget, { margin: 1, width: 240 });
+
             const doc = (
                 <TicketCaissePDF
                     row={row}
                     exercice={exercices}
                     selectedEx={selectedEx}
                     orderInfo={orderInfo}
+                    qrDataUrl={qrDataUrl}
                 />
             );
 

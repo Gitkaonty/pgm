@@ -4,7 +4,7 @@ import { URL } from '../../../config/axios';
 
 // On passe 'anouveau', 'recuAnnee' et 'totalAPayer' directement en props
 // On passe aussi 'selectedEx' et 'orderInfo' pour éviter les variables globales
-const TicketNotePDF = ({ row, exercice, selectedEx, orderInfo, synthese }) => {
+const TicketNotePDF = ({ row, exercice, selectedEx, orderInfo, synthese, qrDataUrl }) => {
 
     const data = Array.isArray(orderInfo) ? orderInfo[0] : orderInfo;
     const url = URL; // À adapter ou passer en prop
@@ -73,6 +73,16 @@ const TicketNotePDF = ({ row, exercice, selectedEx, orderInfo, synthese }) => {
     return (
         <Document>
             <Page size="A4" style={{ padding: 40, fontSize: 10, fontFamily: 'Helvetica' }}>
+                {/* QR code → site de l'ordre (placé dans l'espace vide en haut à droite) */}
+                {qrDataUrl && (
+                    <View style={{ position: 'absolute', top: 165, right: 45, alignItems: 'center' }}>
+                        <Image src={qrDataUrl} style={{ width: 95, height: 95 }} />
+                        <Text style={{ fontSize: 7, color: '#64748b', marginTop: 2 }}>
+                            Scannez-moi
+                        </Text>
+                    </View>
+                )}
+
                 {/* Header */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
                     <View style={{ width: 100, height: 100 }}>
@@ -222,23 +232,72 @@ const TicketNotePDF = ({ row, exercice, selectedEx, orderInfo, synthese }) => {
                     <Text style={{ fontSize: 9, marginLeft: 20 }}>- 34- OECFM - n°00012 01200 61005213011 13 - BGFI MADAGASCAR - Antsahavola - 101 - Antananarivo</Text>
                 </View>
 
-                {/* Signatures */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 40 }}>
-                    <View style={{ alignItems: 'center', width: 200 }}>
-                        <Text>Le Trésorier</Text>
-                        {row.valide && data.sig_tresorier && (
-                            <Image style={{ width: 80, height: 80 }} src={`${url}/uploads/signatures/${data.sig_tresorier}`} />
+
+                    {/* Trésorier */}
+                    <View style={{ alignItems: 'center', width: 250 }}>
+                        <Text
+                            style={{
+                                marginBottom: '-20px'
+                            }}
+                        >Le Trésorier</Text>
+                        {/* Signature entre le titre et le nom (dans le flux, rien n'est caché) */}
+                        {row.valide && data.sig_tresorier ? (
+                            <Image
+                                style={{
+                                    width: 200,
+                                    // height: 80,
+                                    // objectFit: 'contain',
+                                    // marginVertical: 4
+                                }}
+                                src={`${url}/uploads/signatures/${data.sig_tresorier}`}
+                            />
+                        ) : (
+                            <View
+                            // style={{ height: 50 }}
+                            />
                         )}
-                        <Text style={{ marginTop: row.valide ? 5 : 40 }}>{nom_tresorier}</Text>
+                        <Text
+                            style={{
+                                marginTop: '-50px'
+                            }}
+                        >{nom_tresorier}</Text>
                     </View>
-                    <View style={{ alignItems: 'center', width: 200 }}>
-                        <Text>Le Vice-Président</Text>
-                        {row.valide && data.sig_vice_president_admin && (
-                            <Image style={{ width: 80, height: 80 }} src={`${url}/uploads/signatures/${data.sig_vice_president_admin}`} />
+
+                    {/* Vice-Président */}
+                    <View style={{ alignItems: 'center', width: 250 }}>
+                        <Text
+                        style={{
+                            marginBottom : '-17px'
+                        }}
+                        >Le Vice-Président</Text>
+                        {/* Signature entre le titre et le nom (dans le flux, rien n'est caché) */}
+                        {row.valide && data.sig_vice_president_admin ? (
+                            <Image
+                                style={{
+                                    width: 200,
+                                    // height: 80,
+                                    objectFit: 'contain',
+                                    // marginVertical: 4
+                                }}
+                                src={`${url}/uploads/signatures/${data.sig_vice_president_admin}`}
+                            />
+                        ) : (
+                            <View
+                            // style={{
+                            //     height: 50
+                            // }}
+                            />
                         )}
-                        <Text style={{ marginTop: row.valide ? 5 : 40 }}>{nom_vice_president_admin}</Text>
+                        <Text
+                        style={{
+                            marginTop : '-50px'
+                        }}
+                        >{nom_vice_president_admin}</Text>
                     </View>
+
                 </View>
+
             </Page>
         </Document>
     );

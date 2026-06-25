@@ -29,6 +29,26 @@ const querySituation = `
     ORDER BY m.nom ASC
 `;
 
+// Recalcule total_ajustement / total_autre_appel / appelnet des appels DÉJÀ générés
+// pour les membres concernés — sans relancer toute la génération automatique.
+// (Si un membre n'a pas encore d'appel généré, il n'y a rien à mettre à jour.)
+async function recalcAppelsTotals(exerciceId, membreIds, transaction) {
+    if (!membreIds || membreIds.length === 0) return;
+    await db.sequelize.query(`
+        UPDATE appels a SET
+            total_ajustement = COALESCE((SELECT SUM(montant_ajustement) FROM ajustementappels WHERE exercice_id = a.exercice_id AND membre_id = a.membre_id), 0),
+            total_autre_appel = COALESCE((SELECT SUM(montant_autre) FROM autres_appels WHERE exercice_id = a.exercice_id AND membre_id = a.membre_id), 0),
+            appelnet = a.montant_du
+                + COALESCE((SELECT SUM(montant_ajustement) FROM ajustementappels WHERE exercice_id = a.exercice_id AND membre_id = a.membre_id), 0)
+                + COALESCE((SELECT SUM(montant_autre) FROM autres_appels WHERE exercice_id = a.exercice_id AND membre_id = a.membre_id), 0)
+        WHERE a.exercice_id = :ex AND a.membre_id IN (:ids)
+    `, {
+        replacements: { ex: exerciceId, ids: membreIds },
+        type: db.sequelize.QueryTypes.UPDATE,
+        transaction
+    });
+}
+
 // 1. RÉCUPÉRER LES APPELS EXISTANTS
 exports.getAppelsByExercice = async (req, res) => {
     const { exerciceId } = req.params;
@@ -90,6 +110,7 @@ exports.getAppelsByExercice = async (req, res) => {
                 associe: a.associe,
                 montant: parseFloat(a.montant_du) || 0,
                 total_ajustement: parseFloat(a.total_ajustement) || 0,
+                total_autre_appel: parseFloat(a.total_autre_appel) || 0,
                 appelnet: parseFloat(a.appelnet) || 0,
                 regime: a.regime,
                 promotion: infoMembre.promotion,
@@ -135,7 +156,7 @@ exports.generateAppelsBrouillon = async (req, res) => {
             ORDER BY m.nom ASC
         `;
 
-        const [members, grille, ajustementsGroupes] = await Promise.all([
+        const [members, grille, ajustementsGroupes, autresGroupes] = await Promise.all([
             db.sequelize.query(querySituationAppel, {
                 replacements: { dateFin: exercice.date_fin },
                 type: db.sequelize.QueryTypes.SELECT
@@ -143,6 +164,12 @@ exports.generateAppelsBrouillon = async (req, res) => {
             db.grille_tarifaires.findAll({ where: { exercice_id: exerciceId } }),
             db.ajustementappels.findAll({
                 attributes: ['membre_id', [db.sequelize.fn('SUM', db.sequelize.col('montant_ajustement')), 'total_somme']],
+                where: { exercice_id: exerciceId },
+                group: ['membre_id'],
+                raw: true
+            }),
+            db.autres_appels.findAll({
+                attributes: ['membre_id', [db.sequelize.fn('SUM', db.sequelize.col('montant_autre')), 'total_somme']],
                 where: { exercice_id: exerciceId },
                 group: ['membre_id'],
                 raw: true
@@ -187,6 +214,9 @@ exports.generateAppelsBrouillon = async (req, res) => {
             const ligneAjust = ajustementsGroupes.find(a => a.membre_id === m.id);
             const totalAjustement = ligneAjust ? parseFloat(ligneAjust.total_somme) : 0;
 
+            const ligneAutre = autresGroupes.find(a => a.membre_id === m.id);
+            const totalAutre = ligneAutre ? parseFloat(ligneAutre.total_somme) : 0;
+
             // Gestion de l'incrément et de la référence
             currentSeq++;
             const formattedSeq = currentSeq.toString().padStart(3, '0');
@@ -201,7 +231,8 @@ exports.generateAppelsBrouillon = async (req, res) => {
                 associe: m.nombre_associe || 0,
                 montant_du: montant,
                 total_ajustement: totalAjustement,
-                appelnet: parseFloat(montant) + totalAjustement,
+                total_autre_appel: totalAutre,
+                appelnet: parseFloat(montant) + totalAjustement + totalAutre,
                 regime: regime,
                 valide: false,
                 etat: 'En attente',
@@ -307,6 +338,17 @@ exports.generateAppelsManuels = async (req, res) => {
             raw: true // Pour obtenir un objet JS simple
         });
 
+        // Sommes des autres appel groupées par membre
+        const autresGroupes = await db.autres_appels.findAll({
+            attributes: [
+                'membre_id',
+                [db.sequelize.fn('SUM', db.sequelize.col('montant_autre')), 'total_somme']
+            ],
+            where: { exercice_id: exerciceId },
+            group: ['membre_id'],
+            raw: true
+        });
+
         const grille = await db.grille_tarifaires.findAll({
             where: { exercice_id: exerciceId }
         });
@@ -340,7 +382,11 @@ exports.generateAppelsManuels = async (req, res) => {
             // On cherche si notre membre actuel a un total dans les ajustements récupérés
             const ligneAjust = ajustementsGroupes.find(a => a.membre_id === m.id);
             const totalAjustement = ligneAjust ? parseFloat(ligneAjust.total_somme) : 0;
-            const appelNet = montant + totalAjustement;
+
+            const ligneAutre = autresGroupes.find(a => a.membre_id === m.id);
+            const totalAutre = ligneAutre ? parseFloat(ligneAutre.total_somme) : 0;
+
+            const appelNet = montant + totalAjustement + totalAutre;
 
             // Gestion de l'incrément et de la référence
             currentSeq++;
@@ -356,6 +402,7 @@ exports.generateAppelsManuels = async (req, res) => {
                 associe: m.nombre_associe,
                 montant_du: montant,
                 total_ajustement: totalAjustement,
+                total_autre_appel: totalAutre,
                 appelnet: appelNet,
                 regime: regime,
                 valide: false,
@@ -403,6 +450,9 @@ exports.updateStatus = async (req, res) => {
 
         if (type === 'appels') {
             await db.appels.update({ valide }, { where: { id } });
+            res.sendStatus(200);
+        } else if (type === 'autres') {
+            await db.autres_appels.update({ valide }, { where: { id } });
             res.sendStatus(200);
         } else {
             await db.ajustementappels.update({ valide }, { where: { id } });
@@ -523,6 +573,9 @@ exports.generateAjustements = async (req, res) => {
         // Insertion en masse
         await db.ajustementappels.bulkCreate(dataAInserer, { transaction });
 
+        // Mise à jour directe des appels déjà générés des membres concernés
+        await recalcAppelsTotals(exerciceId, membresFiltrés.map(m => m.id), transaction);
+
         // 3. IMPORTANT : Valider les changements et LIBÉRER la connexion
         await transaction.commit();
 
@@ -600,17 +653,179 @@ exports.deleteAjustement = async (req, res) => {
     try {
         const { id } = req.params;
 
+        const row = await db.ajustementappels.findByPk(id);
         const deleted = await db.ajustementappels.destroy({
             where: { id: id }
         });
 
         if (deleted) {
+            // Recalcul direct de l'appel net du membre concerné
+            if (row) await recalcAppelsTotals(row.exercice_id, [row.membre_id]);
             res.status(200).json({ message: "Ajustement supprimé avec succès" });
         } else {
             res.status(404).json({ message: "Ajustement non trouvé" });
         }
     } catch (error) {
         console.error("Erreur suppression Ajustement:", error);
+        res.status(500).json({ message: "Erreur lors de la suppression" });
+    }
+};
+
+
+//===================================================================================================================
+//CODE POUR LES AUTRES APPEL (calqué sur les ajustements)
+//===================================================================================================================
+
+// Génération des autres appel avec montant forfaitaire et filtres
+exports.generateAutresAppels = async (req, res) => {
+    const { exerciceId, montant, motif, section, titre, statut, membre } = req.body;
+
+    // Vérifications avant d'ouvrir la transaction
+    if (!membre) {
+        return res.status(400).json({ message: "Veuillez sélectionner un membre" });
+    }
+
+    let transaction;
+
+    try {
+        transaction = await db.sequelize.transaction();
+
+        const exercice = await db.exercices.findByPk(exerciceId, { transaction });
+        if (!exercice) {
+            await transaction.rollback();
+            return res.status(404).json({ message: "Exercice non trouvé" });
+        }
+
+        const situationMembres = await db.sequelize.query(`
+            SELECT m.id, m.matricule, m.nom, m.prenom, u.section, u.statut, u.titre, u.nombre_associe
+            FROM membresidentites m
+            LEFT JOIN membres_updates u ON u.id = (
+                SELECT id FROM membres_updates
+                WHERE membre_id = m.id AND date_modification <= :dateFin
+                ORDER BY date_modification DESC, id DESC LIMIT 1
+            )
+            WHERE membre_active = 'Oui'
+            ORDER BY m.nom ASC
+        `, {
+            replacements: { dateFin: exercice.date_fin },
+            type: db.sequelize.QueryTypes.SELECT,
+            transaction
+        });
+
+        const membresFiltrés = situationMembres.filter(m => {
+            const matchSection = section === "Toutes" || m.section === section;
+            const matchTitre = titre === "Toutes" || m.titre === titre;
+            const matchStatut = statut === "Toutes" || m.statut === statut;
+            const matchMembre = membre === "Tous" || m.id === membre;
+            return matchSection && matchTitre && matchStatut && matchMembre;
+        });
+
+        if (membresFiltrés.length === 0) {
+            await transaction.rollback();
+            return res.status(400).json({ message: "Aucun membre ne correspond aux filtres." });
+        }
+
+        const dataAInserer = membresFiltrés.map(m => ({
+            exercice_id: exerciceId,
+            membre_id: m.id,
+            motif: motif || "Autre appel",
+            section: m.section || "n/a",
+            statut: m.statut || "n/a",
+            titre: m.titre || "n/a",
+            montant_autre: parseFloat(montant),
+            valide: false,
+            type_autre: "AUTRE_APPEL"
+        }));
+
+        await db.autres_appels.bulkCreate(dataAInserer, { transaction });
+
+        // Mise à jour directe des appels déjà générés des membres concernés
+        await recalcAppelsTotals(exerciceId, membresFiltrés.map(m => m.id), transaction);
+
+        await transaction.commit();
+
+        res.json({ message: `${membresFiltrés.length} autre(s) appel(s) généré(s).` });
+
+    } catch (error) {
+        if (transaction) await transaction.rollback();
+        console.error("Erreur Backend (autres appel):", error);
+        res.status(500).json({
+            message: "Erreur serveur lors de la génération.",
+            details: error.message
+        });
+    }
+};
+
+exports.getAutresAppelsByExercice = async (req, res) => {
+    const { exerciceId } = req.params;
+
+    try {
+        const exercice = await db.exercices.findByPk(exerciceId);
+        if (!exercice) return res.status(404).json({ message: "Exercice non trouvé" });
+
+        const autres = await db.sequelize.query(`
+            SELECT
+                a.id, a.exercice_id, a.membre_id, a.montant_autre, a.valide, a.type_autre, a.motif,
+                m.matricule, m.nom, m.prenom,
+                a.section, a.statut, a.titre
+            FROM autres_appels a
+            INNER JOIN membresidentites m ON a.membre_id = m.id
+            LEFT JOIN membres_updates u ON u.id = (
+                SELECT id FROM membres_updates
+                WHERE membre_id = m.id AND date_modification <= :dateFin
+                ORDER BY date_modification DESC, id DESC LIMIT 1
+            )
+            WHERE a.exercice_id = :exerciceId
+            ORDER BY m.nom ASC
+        `, {
+            replacements: {
+                dateFin: exercice.date_fin,
+                exerciceId: exerciceId
+            },
+            type: QueryTypes.SELECT
+        });
+
+        res.json(autres);
+
+    } catch (error) {
+        console.error("Erreur récupération autres appel:", error);
+        res.status(500).json({ message: "Erreur lors de la récupération des données." });
+    }
+};
+
+// Validation groupée des autres appel
+exports.validerPlusieursAutresAppels = async (req, res) => {
+    const { ids } = req.body; // [1, 2, 5, ...]
+    try {
+        await db.autres_appels.update(
+            { valide: true },
+            { where: { id: ids } }
+        );
+        res.sendStatus(200);
+    } catch (err) {
+        res.status(500).json(err);
+    }
+};
+
+// Supprimer un autre appel par son ID
+exports.deleteAutreAppel = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const row = await db.autres_appels.findByPk(id);
+        const deleted = await db.autres_appels.destroy({
+            where: { id: id }
+        });
+
+        if (deleted) {
+            // Recalcul direct de l'appel net du membre concerné
+            if (row) await recalcAppelsTotals(row.exercice_id, [row.membre_id]);
+            res.status(200).json({ message: "Autre appel supprimé avec succès" });
+        } else {
+            res.status(404).json({ message: "Autre appel non trouvé" });
+        }
+    } catch (error) {
+        console.error("Erreur suppression autre appel:", error);
         res.status(500).json({ message: "Erreur lors de la suppression" });
     }
 };
