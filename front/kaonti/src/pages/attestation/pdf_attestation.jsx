@@ -3,7 +3,7 @@ import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, Image } from '
 import useAxiosPrivate from '../../../config/axiosPrivate';
 import { URL } from '../../../config/axios';
 
-const PdfAttestationExpA = ({ rows, infoSignataire }) => {
+const PdfAttestationExpA = ({ rows, infoSignataire, withSignature, qrDataUrl }) => {
     const data = Array.isArray(infoSignataire) ? infoSignataire[0] : infoSignataire;
     const url = URL;
 
@@ -14,6 +14,16 @@ const PdfAttestationExpA = ({ rows, infoSignataire }) => {
     return (
         <Document>
             <Page size="A4" style={{ padding: 40, fontSize: 10, fontFamily: 'Helvetica' }}>
+                {/* QR code → page du site selon la catégorie du membre (haut à droite) */}
+                {qrDataUrl && (
+                    <View style={{ position: 'absolute', top: 165, right: 45, alignItems: 'center' }}>
+                        <Image src={qrDataUrl} style={{ width: 95, height: 95 }} />
+                        <Text style={{ fontSize: 7, color: '#64748b', marginTop: 2 }}>
+                            Scannez-moi
+                        </Text>
+                    </View>
+                )}
+
                 {/* Header avec Logo (Placeholder) */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
                     {/* LOGO à gauche */}
@@ -176,25 +186,29 @@ const PdfAttestationExpA = ({ rows, infoSignataire }) => {
                 {/* Signatures */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 20, marginHorizontal:50 }}>
                     <View style={{ flexDirection: 'column', justifyContent: 'space-between', marginTop: 0, alignContent:'center', alignItems:'center' }}>
-                        <Text>Le Secrétaire Général</Text>
-                        {rows.validation_1 && rows.validation_2 &&
+                        <Text
+                            style = {{marginBottom: '-50px'}}
+                        >Le Secrétaire Général</Text>
+                        {withSignature && rows.validation_1 && rows.validation_2 &&
                             <Image
-                                style={{ width: 100, height: 100, objectFit: 'contain' }}
+                                style={{ width: 200 }}
                                 src={`${url}/uploads/signatures/${data.sig_secretaire}`}
                             />
                         }
-                        <Text style={{marginTop : rows.validation_1? rows.validation_2? 0 : 50 : 50}}>{nom_secretaire}</Text>
+                        <Text style={{marginTop : '-80px' }}>{nom_secretaire}</Text>
                     </View>
                     
                     <View style={{ flexDirection: 'column', justifyContent: 'space-between', marginTop: 0, alignContent:'center', alignItems:'center' }}>
-                        <Text>Le Président</Text>
-                        {rows.validation_1 && rows.validation_2 &&
+                        <Text
+                            style = {{marginBottom: '-50px'}}
+                        >Le Président</Text>
+                        {withSignature && rows.validation_1 && rows.validation_2 &&
                             <Image
-                                style={{ width: 100, height: 100, objectFit: 'contain' }}
+                                style={{ width: 200 }}
                                 src={`${url}/uploads/signatures/${data.sig_president}`}
                             />
                         }
-                        <Text style={{marginTop : rows.validation_1? rows.validation_2? 0 : 50 : 50}}>{nom_president}</Text>
+                        <Text style={{marginTop : '-60px' }}>{nom_president}</Text>
                     </View>
                 </View>
                 

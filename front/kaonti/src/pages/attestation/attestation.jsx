@@ -27,6 +27,7 @@ import { Tabs, Tab } from '@mui/material';
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, Image } from '@react-pdf/renderer';
 import PdfAttestationExpA from './pdf_attestation';
 import { pdf } from '@react-pdf/renderer';
+import QRCode from 'qrcode';
 import { InfoOutlined } from '@mui/icons-material';
 
 const GREEN_MAIN = '#435844';
@@ -169,6 +170,7 @@ const DemandeAttestationModal = ({ open, onClose, membres, exercices, onRefresh 
 const AttestationCard = ({ data, onRefresh, orderInfo }) => {
     const [openDelete, setOpenDelete] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [openSigChoice, setOpenSigChoice] = useState(false);
 
     const axiosPrivate = useAxiosPrivate();
     // Calcul basé sur tes colonnes validation_1 et validation_2
@@ -186,13 +188,28 @@ const AttestationCard = ({ data, onRefresh, orderInfo }) => {
     };
 
     //imprimer l'attestation
-    const handlePrintAttestation = async (data, orderInfo) => {
+    const handlePrintAttestation = async (data, orderInfo, withSignature) => {
         try {
             setLoading(true);
+
+            // QR code → page du site selon la catégorie du membre (comme l'appel)
+            const siteBase = import.meta.env.VITE_PUBLIC_SITE_URL || 'https://www.oecfm.mg';
+            let qrPath = '';
+            if (data.statut === 'Stagiaire' || data.statut === 'Expert Stagiaire') {
+                qrPath = '/fr/liste-stagiaire';
+            } else if (data.titre === 'Tableau A') {
+                qrPath = '/fr/tableau-a';
+            } else if (data.titre === 'Tableau B') {
+                qrPath = '/fr/tableau-b';
+            }
+            const qrDataUrl = await QRCode.toDataURL(`${siteBase}${qrPath}`, { margin: 1, width: 240 });
+
             const doc = (
-                <PdfAttestationExpA 
-                rows={data} 
-                infoSignataire={orderInfo} 
+                <PdfAttestationExpA
+                rows={data}
+                infoSignataire={orderInfo}
+                withSignature={withSignature}
+                qrDataUrl={qrDataUrl}
                 />
             );
 
@@ -373,7 +390,7 @@ const AttestationCard = ({ data, onRefresh, orderInfo }) => {
                                 /* 2. Version active (Le lien n'existe que quand c'est prêt) */
                                
                                 <IconButton
-                                    onClick={() => handlePrintAttestation(data, orderInfo)}
+                                    onClick={() => setOpenSigChoice(true)}
                                     sx={{
                                         bgcolor: '#f5f5f5',
                                         color: GREEN_MAIN,
@@ -417,6 +434,39 @@ const AttestationCard = ({ data, onRefresh, orderInfo }) => {
                 onConfirm={handleDelete}
                 title={`${data.nom} ${data.prenom}`}
             />
+
+            {/* Choix : impression avec ou sans signature électronique */}
+            <Dialog
+                open={openSigChoice}
+                onClose={() => setOpenSigChoice(false)}
+                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 800 }}>Impression de l'attestation</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2">
+                        Voulez-vous imprimer l'attestation <strong>avec la signature électronique</strong> ou <strong>sans</strong> ?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, gap: 1 }}>
+                    <Button onClick={() => setOpenSigChoice(false)} sx={{ color: 'text.secondary', fontWeight: 700 }}>
+                        Annuler
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        onClick={() => { setOpenSigChoice(false); handlePrintAttestation(data, orderInfo, false); }}
+                        sx={{ fontWeight: 700, textTransform: 'none' }}
+                    >
+                        Sans signature
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => { setOpenSigChoice(false); handlePrintAttestation(data, orderInfo, true); }}
+                        sx={{ bgcolor: GREEN_MAIN, fontWeight: 700, textTransform: 'none' }}
+                    >
+                        Avec signature
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </>
     );
 };

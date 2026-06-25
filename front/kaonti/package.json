@@ -47,6 +47,7 @@
     "lodash.debounce": "^4.0.8",
     "number-to-letters": "^1.0.0",
     "papaparse": "^5.5.3",
+    "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-apexcharts": "^2.0.1",
     "react-auth-kit": "^3.1.2",

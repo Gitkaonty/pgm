@@ -109,8 +109,8 @@ const Exercices = () => {
       await axiosPrivate.delete(`/api/exercices/${deleteId}`);
       setExercices(exercices.filter(ex => ex.id !== deleteId));
       toast.success("Exercice supprimé", { id: loadId });
-    } catch (err) { 
-      toast.error("Erreur lors de la suppression", { id: loadId }); 
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Erreur lors de la suppression", { id: loadId });
     } finally {
       setOpenConfirm(false);
       setDeleteId(null);

@@ -34,6 +34,16 @@ router.delete('/ajustements/:id', verifyJWT, appelController.deleteAjustement);
 // Validation global des appels
 router.post('/valider-ajustements', verifyJWT, appelController.validerPlusieursAjustements);
 
+// --- SECTION : AUTRES APPEL (Tab 3) ---
+// Récupérer les autres appel
+router.get('/autres-appels/:exerciceId', verifyJWT, appelController.getAutresAppelsByExercice);
+// Générer les autres appel forfaitaires
+router.post('/generate-autres-appels', verifyJWT, appelController.generateAutresAppels);
+// Validation groupée des autres appel
+router.post('/valider-autres-appels', verifyJWT, appelController.validerPlusieursAutresAppels);
+// Supprimer un autre appel
+router.delete('/autres-appels/:id', verifyJWT, appelController.deleteAutreAppel);
+
 //récupération infos membre (total appel, anouveau et autre appel)
 router.get('/synthese-appel', verifyJWT, appelController.getSyntheseReglementAppel);
 

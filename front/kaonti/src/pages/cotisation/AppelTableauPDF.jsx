@@ -82,7 +82,8 @@ const styles = StyleSheet.create({
 
 const ExportAppelPDF = ({ data, tabValue, exerciceLabel }) => {
     // Calcul des totaux
-    const totalCotisation = data.reduce((sum, r) => sum + (Number(tabValue === 0 ? r.montant : r.montant_ajustement) || 0), 0);
+    const montantOf = (r) => tabValue === 0 ? r.montant : tabValue === 1 ? r.montant_ajustement : r.montant_autre;
+    const totalCotisation = data.reduce((sum, r) => sum + (Number(montantOf(r)) || 0), 0);
     const totalAjustement = data.reduce((sum, r) => sum + (Number(r.total_ajustement) || 0), 0);
     const totalNet = data.reduce((sum, r) => sum + (Number(r.appelnet) || 0), 0);
 
@@ -109,7 +110,7 @@ const ExportAppelPDF = ({ data, tabValue, exerciceLabel }) => {
                         </View>
                     </View>
                     <View style={styles.docInfo}>
-                        <Text style={styles.title}>{tabValue === 0 ? "Tableau des Appels de Cotisations" : "Récapitulatif des Ajustements"}</Text>
+                        <Text style={styles.title}>{tabValue === 0 ? "Tableau des Appels de Cotisations" : tabValue === 1 ? "Récapitulatif des Ajustements" : "Récapitulatif des Autres appel"}</Text>
                         <Text style={styles.exercice}>Période : {exerciceLabel}</Text>
                         <Text style={styles.exercice}>Date d'édition : {new Date().toLocaleDateString('fr-FR')}</Text>
                     </View>
@@ -150,7 +151,7 @@ const ExportAppelPDF = ({ data, tabValue, exerciceLabel }) => {
                             <Text style={[styles.tableCell, styles.colRegime]}>
                                 {row.regime === "1" || row.regime === 1 ? "Réduit" : row.regime === "0" || row.regime === 0 ? "Normal" : "-"}
                             </Text>
-                            <Text style={[styles.tableCell, styles.colMontant]}>{fNum(tabValue === 0 ? row.montant : row.montant_ajustement)}</Text>
+                            <Text style={[styles.tableCell, styles.colMontant]}>{fNum(montantOf(row))}</Text>
                             {tabValue === 0 && (
                                 <>
                                     <Text style={[styles.tableCell, styles.colAjust]}>{fNum(row.total_ajustement)}</Text>
