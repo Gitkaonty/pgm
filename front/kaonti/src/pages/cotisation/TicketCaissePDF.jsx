@@ -97,7 +97,7 @@ const TicketCaissePDF = ({ row, exercice, selectedEx, orderInfo, qrDataUrl }) =>
                 {/* QR code → site de l'ordre (haut à droite) */}
                 {qrDataUrl && (
                     <View style={{ position: 'absolute', top: 165, right: 45, alignItems: 'center' }}>
-                        <Image src={qrDataUrl} style={{ width: 95, height: 95 }} />
+                        <Image src={qrDataUrl} style={{ width: 58, height: 58 }} />
                         <Text style={{ fontSize: 7, color: '#64748b', marginTop: 2 }}>
                             Scannez-moi
                         </Text>

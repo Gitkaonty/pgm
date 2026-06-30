@@ -76,7 +76,7 @@ const TicketNotePDF = ({ row, exercice, selectedEx, orderInfo, synthese, qrDataU
                 {/* QR code → site de l'ordre (placé dans l'espace vide en haut à droite) */}
                 {qrDataUrl && (
                     <View style={{ position: 'absolute', top: 165, right: 45, alignItems: 'center' }}>
-                        <Image src={qrDataUrl} style={{ width: 95, height: 95 }} />
+                        <Image src={qrDataUrl} style={{ width: 58, height: 58 }} />
                         <Text style={{ fontSize: 7, color: '#64748b', marginTop: 2 }}>
                             Scannez-moi
                         </Text>
@@ -240,7 +240,9 @@ const TicketNotePDF = ({ row, exercice, selectedEx, orderInfo, synthese, qrDataU
                             style={{
                                 marginBottom: '-20px'
                             }}
-                        >Le Trésorier</Text>
+                        >
+                            Le Trésorier
+                        </Text>
                         {/* Signature entre le titre et le nom (dans le flux, rien n'est caché) */}
                         {row.valide && data.sig_tresorier ? (
                             <Image
@@ -261,15 +263,17 @@ const TicketNotePDF = ({ row, exercice, selectedEx, orderInfo, synthese, qrDataU
                             style={{
                                 marginTop: '-50px'
                             }}
-                        >{nom_tresorier}</Text>
+                        >
+                            {nom_tresorier}
+                        </Text>
                     </View>
 
                     {/* Vice-Président */}
                     <View style={{ alignItems: 'center', width: 250 }}>
                         <Text
-                        style={{
-                            marginBottom : '-17px'
-                        }}
+                            style={{
+                                marginBottom: '-17px'
+                            }}
                         >Le Vice-Président</Text>
                         {/* Signature entre le titre et le nom (dans le flux, rien n'est caché) */}
                         {row.valide && data.sig_vice_president_admin ? (
@@ -290,9 +294,9 @@ const TicketNotePDF = ({ row, exercice, selectedEx, orderInfo, synthese, qrDataU
                             />
                         )}
                         <Text
-                        style={{
-                            marginTop : '-50px'
-                        }}
+                            style={{
+                                marginTop: '-50px'
+                            }}
                         >{nom_vice_president_admin}</Text>
                     </View>
 

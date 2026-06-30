@@ -1232,21 +1232,19 @@ const PaiementPage = () => {
                     }
 
                     <Button
-                        size="small"
                         variant="outlined"
                         startIcon={<SaveIcon />}
                         onClick={handleExportExcel}
-                        sx={{ height: 37, color: '#1d6f42', borderColor: '#1d6f42', fontWeight: 700, borderRadius: '10px', textTransform: 'none' }}
+                        sx={{ ml: 1, color: '#1d6f42', borderColor: '#1d6f42' }}
                     >
                         Télécharger Excel
                     </Button>
 
                     <Button
-                        onClick={() => handlePrintPaiementTable(rows, getFullExerciceLabel())}
-                        size="small"
                         variant="outlined"
                         startIcon={loading ? <CircularProgress size={16} /> : <LocalPrintshopOutlined />}
-                        sx={{ height: 35, color: '#b91c1c', borderColor: '#b91c1c', fontWeight: 700, borderRadius: '10px', textTransform: 'none' }}
+                        onClick={() => handlePrintPaiementTable(rows, getFullExerciceLabel())}
+                        sx={{ ml: 1, color: '#b91c1c', borderColor: '#b91c1c' }}
                     >
                         Télécharger PDF
                     </Button>
